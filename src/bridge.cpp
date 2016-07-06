@@ -375,6 +375,10 @@ Bridge::Bridge() {
     pinMode(LIGHT_STATE,       INPUT);
     pinMode(PUSH_BUTTON_STATE, INPUT);
 
+    for(int i = 0; i < TH_LAST; ++i) {
+        pthread_mutex_init(&mutexs[i], NULL);
+    }
+
     pthread_create(&th[TH_CURTAIN], NULL, curtain_, NULL);
     pthread_create(&th[TH_STATUS_BAR], NULL, statusBar_, NULL);
     pthread_create(&th[TH_MAINLIGHT], NULL, mainLight_, NULL);
