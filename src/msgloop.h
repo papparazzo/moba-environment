@@ -9,21 +9,24 @@
 #define	MESSAGELOOP_H
 
 #include <string>
+#include <boost/shared_ptr.hpp>
+#include <boost/noncopyable.hpp>
 
 #include "bridge.h"
 
 #include <moba/msghandler.h>
 #include <moba/log.h>
 
-class MessageLoop {
+class MessageLoop : private boost::noncopyable {
     public:
-        MessageLoop(const std::string &appName, const Version &version);
-        MessageLoop(const MessageLoop& orig) {
-        }
-        virtual ~MessageLoop() {
-        }
+        MessageLoop(
+            const std::string &appName,
+            const Version &version,
+            boost::shared_ptr<Bridge> bridge
+        );
 
         void run();
+        void init();
         void connect(const std::string &host, int port);
 
     protected:
@@ -41,7 +44,9 @@ class MessageLoop {
         long appId;
         std::string appName;
         Version version;
-        Bridge bridge;
+        boost::shared_ptr<Bridge> bridge;
+
+        Bridge::StatusBarState statusbarState;
 };
 
 #endif	/* MESSAGELOOP_H */

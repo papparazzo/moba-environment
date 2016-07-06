@@ -12,9 +12,10 @@ class Bridge {
     public:
         enum StatusBarState {
             SBS_ERROR          = 0,   // rot blitz
-            SBS_STANDBY        = 1,   // grün blitz
-            SBS_POWER_OFF      = 2,   // rot
-            SBS_EMERGENCY_STOP = 3,   // rot blink
+            SBS_INIT           = 1,   // rot
+            SBS_POWER_OFF      = 2,   // rot blink
+
+            SBS_STANDBY        = 3,   // grün blitz
             SBS_READY          = 4,   // grün
             SBS_AUTOMATIC      = 5    // grün blink
         };
@@ -33,9 +34,7 @@ class Bridge {
         };
 
         Bridge();
-        Bridge(const Bridge& orig);
-        virtual ~Bridge() {
-        }
+        virtual ~Bridge();
 
         void curtainUp();
         void curtainDown();
@@ -59,6 +58,8 @@ class Bridge {
 
         SwitchState checkSwitchState();
 
+    private:
+        Bridge(const Bridge& orig);
 };
 
 #endif	// BRIDGE_H

@@ -9,13 +9,15 @@
 
 #include "msgloop.h"
 
-MessageLoop::MessageLoop(const std::string &appName, const Version &version) :
-appName(appName), version(version) {
+MessageLoop::MessageLoop(
+    const std::string &appName, const Version &version, boost::shared_ptr<Bridge> bridge
+) : appName(appName), version(version), bridge(bridge) {
+    this->bridge->setStatusBar(Bridge::SBS_INIT);
 }
 
 void MessageLoop::run() {
     while(true) {
-        Bridge::SwitchState ss = this->bridge.checkSwitchState();
+        Bridge::SwitchState ss = this->bridge->checkSwitchState();
 
         // Taster: 1x kurz -> Ruhemodus an / aus
         //         2x kurz -> Automatik an / aus
@@ -61,6 +63,7 @@ void MessageLoop::run() {
                 this->setAmbience(msg->getData());
                 break;
 
+            case Message::MT_SET_HARDWARE_STATE:
             case Message::MT_HARDWARE_STATE_CHANGED: {
                 boost::shared_ptr<JsonString> s =
                 boost::dynamic_pointer_cast<JsonString>(msg->getData());
@@ -76,7 +79,7 @@ void MessageLoop::run() {
             }
 
             case Message::MT_CLIENT_SHUTDOWN:
-                this->bridge.shutdown();
+                this->bridge->shutdown();
                 return;
 
             case Message::MT_ERROR:
@@ -84,12 +87,20 @@ void MessageLoop::run() {
                 break;
 
             case Message::MT_CLIENT_RESET:
-                this->bridge.reboot();
+                this->bridge->reboot();
                 return;
 
             case Message::MT_CLIENT_SELF_TESTING:
-                this->bridge.selftesting();
+                this->bridge->selftesting();
                 break;
+
+            case Message::MT_SYSTEM_NOTICE: {
+                JsonObjectPtr o = boost::dynamic_pointer_cast<JsonObject>(msg->getData());
+                LOG(tlog::Info) << castToString(o->at("type")) << ": [" <<
+                castToString(o->at("caption")) << "] " <<
+                castToString(o->at("text"));
+                break;
+            }
 
             default:
                 break;
@@ -111,6 +122,11 @@ void MessageLoop::connect(const std::string &host, int port) {
         groups
     );
     LOG(tlog::Notice) << "AppId <" << this->appId << ">";
+}
+
+void MessageLoop::init() {
+    this->msgHandler.sendGetHardwareState();
+    this->msgHandler.sendGetAutoMode();
 }
 
 void MessageLoop::printError(JsonItemPtr ptr) {
@@ -144,15 +160,15 @@ void MessageLoop::setEnvironment(JsonItemPtr ptr) {
     switch(thst) {
         case JsonSwitch::AUTO:
         case JsonSwitch::ON:
-            this->bridge.thunderstormOn();
+            this->bridge->thunderstormOn();
             break;
 
         case JsonSwitch::OFF:
-            this->bridge.thunderstormOff();
+            this->bridge->thunderstormOff();
             break;
 
         case JsonSwitch::TRIGGER:
-            this->bridge.thunderstormTrigger();
+            this->bridge->thunderstormTrigger();
             break;
     }
 
@@ -160,15 +176,15 @@ void MessageLoop::setEnvironment(JsonItemPtr ptr) {
         switch(a[i]) {
             case JsonSwitch::AUTO:
             case JsonSwitch::ON:
-                this->bridge.auxOn((Bridge::AuxPin)i);
+                this->bridge->auxOn((Bridge::AuxPin)i);
                 break;
 
             case JsonSwitch::OFF:
-                this->bridge.auxOff((Bridge::AuxPin)i);
+                this->bridge->auxOff((Bridge::AuxPin)i);
                 break;
 
             case JsonSwitch::TRIGGER:
-                this->bridge.auxTrigger((Bridge::AuxPin)i);
+                this->bridge->auxTrigger((Bridge::AuxPin)i);
                 break;
         }
     }
@@ -182,15 +198,20 @@ void MessageLoop::setAmbience(JsonItemPtr ptr) {
     LOG(tlog::Notice) << "curtainUp    <" << cuup << ">";
     LOG(tlog::Notice) << "mainLightOn  <" << mlon << ">";
 
+    if(this->automatic) {
+        LOG(tlog::Warning) << "automatic is on!";
+        return;
+    }
+
     if(mlon == JsonThreeState::ON) {
-        this->bridge.mainLightOn();
+        this->bridge->mainLightOn();
     } else if(mlon == JsonThreeState::OFF) {
-        this->bridge.mainLightOff();
+        this->bridge->mainLightOff();
     }
     if(cuup == JsonThreeState::ON) {
-        this->bridge.curtainUp();
+        this->bridge->curtainUp();
     } else if(cuup == JsonThreeState::OFF) {
-        this->bridge.curtainDown();
+        this->bridge->curtainDown();
     }
 }
 
@@ -202,52 +223,40 @@ void MessageLoop::setAutoMode(bool on) {
     if(on) {
         LOG(tlog::Notice) << "setAutoMode <on>";
         this->automatic = true;
-        this->bridge.curtainDown();
-        this->bridge.mainLightOff();
-        // FIXME: Achtung prüfen, ob Notaus...
-        this->bridge.setStatusBar(Bridge::SBS_AUTOMATIC);
+        this->bridge->curtainDown();
+        if(this->statusbarState == Bridge::SBS_READY) {
+            this->bridge->mainLightOff();
+            this->statusbarState == Bridge::SBS_AUTOMATIC;
+            this->bridge->setStatusBar(this->statusbarState);
+        }
         return;
     }
     LOG(tlog::Notice) << "setAutoMode <off>";
     this->automatic = false;
-    this->bridge.curtainDown();
-    this->bridge.mainLightOff();
-    // FIXME: Achtung prüfen, ob Notaus...
-    this->bridge.setStatusBar(Bridge::SBS_READY);
+    this->bridge->curtainUp();
+    if(this->statusbarState == Bridge::SBS_AUTOMATIC) {
+        this->statusbarState == Bridge::SBS_READY;
+        this->bridge->setStatusBar(this->statusbarState);
+    }
     return;
 }
 
 void MessageLoop::setHardwareState(const std::string &s) {
     if(boost::iequals(s, "STANDBY")) {
-        this->bridge.setStatusBar(Bridge::SBS_STANDBY);
+        this->statusbarState = Bridge::SBS_STANDBY;
     } else if(boost::iequals(s, "POWER_OFF")) {
-        this->bridge.setStatusBar(Bridge::SBS_POWER_OFF);
+        this->statusbarState = Bridge::SBS_POWER_OFF;
+        if(this->automatic) {
+            this->bridge->mainLightOn();
+        }
     } else if(boost::iequals(s, "READY") && this->automatic) {
-        this->bridge.setStatusBar(Bridge::SBS_AUTOMATIC);
+        this->statusbarState = Bridge::SBS_AUTOMATIC;
+        this->bridge->mainLightOff();
     } else if(boost::iequals(s, "READY")) {
-        this->bridge.setStatusBar(Bridge::SBS_READY);
+        this->statusbarState = Bridge::SBS_READY;
     } else {
-
+        this->statusbarState = Bridge::SBS_ERROR;
     }
-/*
-            SBS_ERROR          = 0,   // rot blitz
-            SBS_STANDBY        = 1,   // grün blitz
-            SBS_POWER_OFF      = 2,   // rot
-            SBS_EMERGENCY_STOP = 3,   // rot blink
-            SBS_READY          = 4,   // grün
-            SBS_AUTOMATIC      = 5    // grün blink
- */
-
+    this->bridge->setStatusBar(this->statusbarState);
 }
-
-
-
-//msgHandler.sendGetGlobalTimer();
-//msgHandler.sendGetEnvironment();
-//msgHandler.sendHardwareStateRequest();
-//msgHandler.sendGetServerState();
-
-
-
-
 

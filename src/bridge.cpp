@@ -98,7 +98,7 @@ namespace {
         "thunder4.mp3",
     };
 
-    Bridge::StatusBarState statusBarState_;
+    Bridge::StatusBarState statusBarState_ = Bridge::SBS_INIT;
     Bridge::SwitchState switchState_;
     CurtainState curtainState_     = CURTAIN_STOP;
     MainLightState mainLightState_ = MAINLIGHT_IDLE;
@@ -128,8 +128,8 @@ namespace {
 
             switch(sbs) {
                 case Bridge::SBS_ERROR:
+                case Bridge::SBS_INIT:
                 case Bridge::SBS_POWER_OFF:
-                case Bridge::SBS_EMERGENCY_STOP:
                     digitalWrite(STATUS_RED, HIGH);
                     digitalWrite(STATUS_GREEN, LOW);
                     break;
@@ -156,7 +156,7 @@ namespace {
             }
             delay(700);
             switch(sbs) {
-                case Bridge::SBS_EMERGENCY_STOP:
+                case Bridge::SBS_POWER_OFF:
                     digitalWrite(STATUS_RED, LOW);
                     break;
 
@@ -375,10 +375,6 @@ Bridge::Bridge() {
     pinMode(LIGHT_STATE,       INPUT);
     pinMode(PUSH_BUTTON_STATE, INPUT);
 
-    for(int i = 0; i < TH_LAST; ++i) {
-        pthread_mutex_init(&mutexs[i], NULL);
-    }
-
     pthread_create(&th[TH_CURTAIN], NULL, curtain_, NULL);
     pthread_create(&th[TH_STATUS_BAR], NULL, statusBar_, NULL);
     pthread_create(&th[TH_MAINLIGHT], NULL, mainLight_, NULL);
@@ -389,6 +385,24 @@ Bridge::Bridge() {
     for(int i = 0; i < TH_LAST; ++i) {
         pthread_detach(th[i]);
     }
+}
+
+Bridge::~Bridge() {
+    for(int i = 0; i < TH_LAST; ++i) {
+        pthread_cancel(th[i]);
+    }
+    digitalWrite(CURTAIN_DIR,  LOW);
+    digitalWrite(CURTAIN_ON,   LOW);
+    digitalWrite(MAIN_LIGHT,   LOW);
+    digitalWrite(SHUTDOWN,     LOW);
+    digitalWrite(AUX_1,        LOW);
+    digitalWrite(AUX_2,        LOW);
+    digitalWrite(AUX_3,        LOW);
+    digitalWrite(FLASH_1,      LOW);
+    digitalWrite(FLASH_2,      LOW);
+    digitalWrite(FLASH_3,      LOW);
+    digitalWrite(STATUS_RED,   LOW);
+    digitalWrite(STATUS_GREEN, LOW);
 }
 
 void Bridge::selftesting() {
@@ -402,7 +416,7 @@ void Bridge::shutdown() {
     digitalWrite(SHUTDOWN, HIGH);
     sleep(2);
     digitalWrite(SHUTDOWN, LOW);
-    //execl("/sbin/shutdown", "shutdown", "-h", "now", NULL);
+    execl("/sbin/shutdown", "shutdown", "-h", "now", NULL);
 }
 
 void Bridge::reboot() {

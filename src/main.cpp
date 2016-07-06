@@ -170,10 +170,13 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 */
+    boost::shared_ptr<Bridge> bridge(new Bridge());
+
     while(true) {
         try {
-            MessageLoop loop(appData.appName, Version(appData.version));
+            MessageLoop loop(appData.appName, Version(appData.version), bridge);
             loop.connect(appData.host, appData.port);
+            loop.init();
             loop.run();
             exit(EXIT_SUCCESS);
         } catch(std::exception &e) {
