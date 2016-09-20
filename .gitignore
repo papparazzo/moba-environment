@@ -52,6 +52,6 @@ Makefile.in
 /libtool
 /config.h
 /config.status
-/moba-tester
+/moba-environment
 /core
 /response.log
