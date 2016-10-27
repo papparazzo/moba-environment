@@ -1,8 +1,21 @@
 /*
- * File:   bridge.cpp
- * Author: stefan
+ *  Project:    moba-environment
  *
- * Created on December 20, 2015, 10:34 PM
+ *  Copyright (C) 2016 Stefan Paproth <pappi-@gmx.de>
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU Affero General Public License as
+ *  published by the Free Software Foundation, either version 3 of the
+ *  License, or (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ *  GNU Affero General Public License for more details.
+ *
+ *  You should have received a copy of the GNU Affero General Public License
+ *  along with this program. If not, see <http://www.gnu.org/licenses/agpl.txt>.
+ *
  */
 
 #include <wiringPi.h>
@@ -13,6 +26,7 @@
 #include <pthread.h>
 
 #include <moba/log.h>
+#include <moba/atomic.h>
 
 #include "bridge.h"
 
@@ -47,6 +61,7 @@
 
 namespace {
 
+    /*
     enum PinOutputMapping {
         FLASH_3      = 29,       // PIN 40
         FLASH_2      = 28,       // PIN 38
@@ -66,6 +81,32 @@ namespace {
     enum PinInputMapping {
         PUSH_BUTTON_STATE = 0,   // PIN 12
         LIGHT_STATE       = 1,  // PIN 11
+    };
+     */
+
+
+
+    enum PinOutputMapping {
+        AUX_3        = 4,        // PIN 16
+        AUX_2        = 5,        // PIN 18
+        AUX_1        = 12,       // PIN 19
+
+        FLASH_1      = 13,       // PIN 21
+        FLASH_2      = 6,        // PIN 22
+        FLASH_3      = 14,       // PIN 23
+
+        SHUTDOWN     = 21,       // PIN 29
+        CURTAIN_DIR  = 22,       // PIN 31
+        CURTAIN_ON   = 26,       // PIN 32
+        MAIN_LIGHT   = 23,       // PIN 33
+
+        STATUS_GREEN = 24,       // PIN 35
+        STATUS_RED   = 27,       // PIN 36
+    };
+
+    enum PinInputMapping {
+        PUSH_BUTTON_STATE = 25,   // PIN 37
+        LIGHT_STATE       = 28,   // PIN 38
     };
 
     enum CurtainState {
@@ -87,7 +128,7 @@ namespace {
         AUX_OFF_IDLE = 3,
     };
 
-    int auxPins[] = {AUX_1, AUX_2, AUX_3};
+    int auxPins[]   = {AUX_1, AUX_2, AUX_3};
     int flashPins[] = {FLASH_1, FLASH_2, FLASH_3};
 
     const char *thunder[] = {
@@ -98,14 +139,15 @@ namespace {
         "thunder4.mp3",
     };
 
-    Bridge::StatusBarState statusBarState_ = Bridge::SBS_INIT;
-    Bridge::SwitchState switchState_;
-    CurtainState curtainState_     = CURTAIN_STOP;
-    MainLightState mainLightState_ = MAINLIGHT_IDLE;
-    AuxState auxPinState_[]        = {AUX_OFF, AUX_OFF, AUX_OFF};
-    bool auxPinTrigger_[]          = {false, false, false};
-    bool thunderStormState_        = false;
-    bool thunderStormTrigger_      = false;
+    moba::Atomic<Bridge::StatusBarState> statusBarState_ = Bridge::SBS_INIT;
+    moba::Atomic<Bridge::SwitchState> switchState_       = Bridge::SS_UNSET;
+    moba::Atomic<CurtainState> curtainState_             = CURTAIN_STOP;
+    moba::Atomic<MainLightState> mainLightState_         = MAINLIGHT_IDLE;
+    moba::Atomic<AuxState> auxPinState_[]                = {AUX_OFF, AUX_OFF, AUX_OFF};
+    moba::Atomic<bool> auxPinTrigger_[]                  = {false, false, false};
+    moba::Atomic<bool> thunderStormState_                = false;
+    moba::Atomic<bool> thunderStormTrigger_              = false;
+    moba::Atomic<bool> selftestRunning_                  = false;
 
     enum ThreadIdentifier {
         TH_STATUS_BAR = 0,
@@ -117,14 +159,18 @@ namespace {
         TH_LAST
     };
 
-    pthread_t       th[TH_LAST];
-    pthread_mutex_t mutexs[TH_LAST];
+    pthread_t th[TH_LAST];
+
+    moba::Atomic<bool> running = true;
 
     void *statusBar_(void *) {
-        while(true) {
-            pthread_mutex_lock(&mutexs[TH_STATUS_BAR]);
+        while(running) {
+            if(selftestRunning_) {
+                delay(500);
+                continue;
+            }
+
             Bridge::StatusBarState sbs = statusBarState_;
-            pthread_mutex_unlock(&mutexs[TH_STATUS_BAR]);
 
             switch(sbs) {
                 case Bridge::SBS_ERROR:
@@ -169,26 +215,29 @@ namespace {
             }
             delay(750);
         }
+        digitalWrite(STATUS_RED, LOW);
+        digitalWrite(STATUS_GREEN, LOW);
         return NULL;
     }
 
     void *curtain_(void *) {
         CurtainState currentCurtainState = CURTAIN_STOP;
 
-        while(true) {
+        while(running) {
+            if(selftestRunning_) {
+                delay(500);
+                continue;
+            }
+
             sleep(1);
-            pthread_mutex_lock(&mutexs[TH_CURTAIN]);
             if(curtainState_ == CURTAIN_STOP) {
-                pthread_mutex_unlock(&mutexs[TH_CURTAIN]);
                 continue;
             }
 
             if(currentCurtainState == curtainState_) {
-                pthread_mutex_unlock(&mutexs[TH_CURTAIN]);
                 continue;
             }
             currentCurtainState = curtainState_;
-            pthread_mutex_unlock(&mutexs[TH_CURTAIN]);
 
             int dir = LOW;
             if(currentCurtainState == CURTAIN_UP) {
@@ -198,12 +247,9 @@ namespace {
             digitalWrite(CURTAIN_DIR, dir);
 
             for(int i = 0; i < 30; ++i) {
-                pthread_mutex_lock(&mutexs[TH_CURTAIN]);
                 if(currentCurtainState != curtainState_) {
-                    pthread_mutex_unlock(&mutexs[TH_CURTAIN]);
                     break;
                 }
-                pthread_mutex_unlock(&mutexs[TH_CURTAIN]);
                 sleep(1);
             }
             digitalWrite(CURTAIN_ON, LOW);
@@ -213,11 +259,14 @@ namespace {
     }
 
     void *mainLight_(void *) {
-        while(true) {
+        while(running) {
+            if(selftestRunning_) {
+                delay(500);
+                continue;
+            }
+
             sleep(1);
-            pthread_mutex_lock(&mutexs[TH_MAINLIGHT]);
             MainLightState mal = mainLightState_;
-            pthread_mutex_unlock(&mutexs[TH_MAINLIGHT]);
 
             if(mal == MAINLIGHT_IDLE) {
                 continue;
@@ -231,23 +280,23 @@ namespace {
             digitalWrite(MAIN_LIGHT, HIGH);
             delay(500);
             digitalWrite(MAIN_LIGHT, LOW);
-            pthread_mutex_lock(&mutexs[TH_MAINLIGHT]);
             mainLightState_ = MAINLIGHT_IDLE;
-            pthread_mutex_unlock(&mutexs[TH_MAINLIGHT]);
         }
         return NULL;
     }
 
     void *thunderStorm_(void *) {
-        while(true) {
-            pthread_mutex_lock(&mutexs[TH_THUNDERSTORM]);
+        while(running) {
+            if(selftestRunning_) {
+                delay(500);
+                continue;
+            }
             if(!thunderStormState_ && !thunderStormTrigger_) {
-                pthread_mutex_unlock(&mutexs[TH_THUNDERSTORM]);
                 sleep(1);
                 continue;
             }
             thunderStormTrigger_ = false;
-            pthread_mutex_unlock(&mutexs[TH_THUNDERSTORM]);
+
             int f = flashPins[rand() % 3];
             for(int i = 0; i < 33; ++i) {
                 digitalWrite(f, HIGH);
@@ -263,13 +312,18 @@ namespace {
     }
 
     void *aux_(void *) {
-        while(true) {
+        while(running) {
+            if(selftestRunning_) {
+                delay(500);
+                continue;
+            }
             sleep(1);
             for(int i = 0; i < 3; ++i) {
-                pthread_mutex_lock(&mutexs[TH_AUX]);
                 AuxState tmpAuxPinState = auxPinState_[i];
+                if(!running) {
+                    tmpAuxPinState = AUX_OFF;
+                }
                 bool tmpAuxPinTrigger = auxPinTrigger_[i];
-                pthread_mutex_unlock(&mutexs[TH_AUX]);
 
                 switch(tmpAuxPinState) {
                     case AUX_ON_IDLE:
@@ -280,24 +334,18 @@ namespace {
                             digitalWrite(auxPins[i], HIGH);
                             delay(500);
                             digitalWrite(auxPins[i], LOW);
-                            pthread_mutex_lock(&mutexs[TH_AUX]);
                             auxPinTrigger_[i] = false;
-                            pthread_mutex_unlock(&mutexs[TH_AUX]);
                         }
                         break;
 
                     case AUX_OFF:
                         digitalWrite(auxPins[i], LOW);
-                        pthread_mutex_lock(&mutexs[TH_AUX]);
                         auxPinState_[i] = AUX_OFF_IDLE;
-                        pthread_mutex_unlock(&mutexs[TH_AUX]);
                         break;
 
                     case AUX_ON:
                         digitalWrite(auxPins[i], HIGH);
-                        pthread_mutex_lock(&mutexs[TH_AUX]);
                         auxPinState_[i] = AUX_ON_IDLE;
-                        pthread_mutex_unlock(&mutexs[TH_AUX]);
                         break;
                 }
             }
@@ -305,14 +353,11 @@ namespace {
     }
 
     void *switchStateChecker_(void *) {
-        while(true) {
-            pthread_mutex_lock(&mutexs[TH_SWITCH_STATE]);
+        while(running) {
             if(switchState_ != Bridge::SS_UNSET) {
-                pthread_mutex_unlock(&mutexs[TH_SWITCH_STATE]);
                 sleep(1);
                 continue;
             }
-            pthread_mutex_unlock(&mutexs[TH_SWITCH_STATE]);
 
             int cntOn = 0;
             int cntOff = 0;
@@ -329,9 +374,7 @@ namespace {
             }
 
             if(cntOn > 2000) {
-                pthread_mutex_lock(&mutexs[TH_SWITCH_STATE]);
                 switchState_ = Bridge::SS_LONG_ONCE;
-                pthread_mutex_unlock(&mutexs[TH_SWITCH_STATE]);
                 continue;
             }
 
@@ -344,16 +387,60 @@ namespace {
             }
 
             if(cntOff > 500) {
-                pthread_mutex_lock(&mutexs[TH_SWITCH_STATE]);
                 switchState_ = Bridge::SS_SHORT_ONCE;
-                pthread_mutex_unlock(&mutexs[TH_SWITCH_STATE]);
                 continue;
             }
-            pthread_mutex_lock(&mutexs[TH_SWITCH_STATE]);
             switchState_ = Bridge::SS_SHORT_TWICE;
-            pthread_mutex_unlock(&mutexs[TH_SWITCH_STATE]);
         }
     }
+/* FIXME hier weiter machen...
+    void *environmentLight_(void *) {
+        while(running) {
+
+        }
+    }
+
+    /** /
+    void *selftesting_(void *) {
+        digitalWrite(STATUS_RED,   HIGH);
+        digitalWrite(STATUS_GREEN, HIGH);
+
+        for(int i = 0; i < 5; ++i) {
+
+            digitalWrite(FLASH_1, HIGH);
+            digitalWrite(FLASH_2, HIGH);
+            digitalWrite(FLASH_3, HIGH);
+            delay(500);
+
+            digitalWrite(FLASH_1, LOW);
+            digitalWrite(FLASH_2, LOW);
+            digitalWrite(FLASH_3, LOW);
+            delay(500);
+
+            digitalWrite(MAIN_LIGHT,   HIGH);
+            delay(500);
+            digitalWrite(MAIN_LIGHT,   LOW);
+            delay(1500);
+            digitalWrite(MAIN_LIGHT,   HIGH);
+            delay(500);
+            digitalWrite(MAIN_LIGHT,   LOW);
+        }
+
+
+    //pinMode(CURTAIN_DIR,       OUTPUT);
+    //pinMode(CURTAIN_ON,        OUTPUT);
+
+
+    //pinMode(AUX_1,             OUTPUT);
+    //pinMode(AUX_2,             OUTPUT);
+    //pinMode(AUX_3,             OUTPUT);
+
+
+        digitalWrite(STATUS_RED,   LOW);
+        digitalWrite(STATUS_GREEN, LOW);
+        selftestRunning_ = false;
+    }
+ //*/
 }
 
 Bridge::Bridge() {
@@ -375,10 +462,6 @@ Bridge::Bridge() {
     pinMode(LIGHT_STATE,       INPUT);
     pinMode(PUSH_BUTTON_STATE, INPUT);
 
-    for(int i = 0; i < TH_LAST; ++i) {
-        pthread_mutex_init(&mutexs[i], NULL);
-    }
-
     pthread_create(&th[TH_CURTAIN], NULL, curtain_, NULL);
     pthread_create(&th[TH_STATUS_BAR], NULL, statusBar_, NULL);
     pthread_create(&th[TH_MAINLIGHT], NULL, mainLight_, NULL);
@@ -392,31 +475,20 @@ Bridge::Bridge() {
 }
 
 Bridge::~Bridge() {
+/*
     for(int i = 0; i < TH_LAST; ++i) {
         pthread_cancel(th[i]);
     }
-    digitalWrite(CURTAIN_DIR,  LOW);
-    digitalWrite(CURTAIN_ON,   LOW);
-    digitalWrite(MAIN_LIGHT,   LOW);
-    digitalWrite(SHUTDOWN,     LOW);
-    digitalWrite(AUX_1,        LOW);
-    digitalWrite(AUX_2,        LOW);
-    digitalWrite(AUX_3,        LOW);
-    digitalWrite(FLASH_1,      LOW);
-    digitalWrite(FLASH_2,      LOW);
-    digitalWrite(FLASH_3,      LOW);
-    digitalWrite(STATUS_RED,   LOW);
-    digitalWrite(STATUS_GREEN, LOW);
+ */
 }
 
 void Bridge::selftesting() {
-    LOG(tlog::Info) << "selftesting";
-    // FIXME
-    return;
+    LOG(moba::INFO) << "selftesting" << std::endl;
+    selftestRunning_ = true;
 }
 
 void Bridge::shutdown() {
-    LOG(tlog::Info) << "shutdown";
+    LOG(moba::INFO) << "shutdown" << std::endl;
     digitalWrite(SHUTDOWN, HIGH);
     sleep(2);
     digitalWrite(SHUTDOWN, LOW);
@@ -424,92 +496,85 @@ void Bridge::shutdown() {
 }
 
 void Bridge::reboot() {
-    LOG(tlog::Info) << "reboot";
+    LOG(moba::INFO) << "reboot" << std::endl;
     execl("/sbin/shutdown", "shutdown", "-r", "now", NULL);
 }
 
 void Bridge::auxOn(AuxPin nb) {
-    LOG(tlog::Info) << "auxOn <" << nb << ">";
-    pthread_mutex_lock(&mutexs[TH_AUX]);
+    LOG(moba::INFO) << "auxOn <" << nb << ">" << std::endl;
     auxPinState_[nb] = AUX_ON;
-    pthread_mutex_unlock(&mutexs[TH_AUX]);
 }
 
 void Bridge::auxOff(AuxPin nb) {
-    LOG(tlog::Info) << "auxOff <" << nb << ">";
-    pthread_mutex_lock(&mutexs[TH_AUX]);
+    LOG(moba::INFO) << "auxOff <" << nb << ">" << std::endl;
     auxPinState_[nb] = AUX_OFF;
-    pthread_mutex_unlock(&mutexs[TH_AUX]);
 }
 
 void Bridge::auxTrigger(AuxPin nb) {
-    LOG(tlog::Info) << "auxTrigger <" << nb << ">";
-    pthread_mutex_lock(&mutexs[TH_AUX]);
+    LOG(moba::INFO) << "auxTrigger <" << nb << ">" << std::endl;
     auxPinTrigger_[nb] = true;
-    pthread_mutex_unlock(&mutexs[TH_AUX]);
 }
 
 void Bridge::curtainUp() {
-    LOG(tlog::Info) << "curtainUp";
-    pthread_mutex_lock(&mutexs[TH_CURTAIN]);
+    LOG(moba::INFO) << "curtainUp" << std::endl;
     curtainState_ = CURTAIN_UP;
-    pthread_mutex_unlock(&mutexs[TH_CURTAIN]);
 }
 
 void Bridge::curtainDown() {
-    LOG(tlog::Info) << "curtainDown";
-    pthread_mutex_lock(&mutexs[TH_CURTAIN]);
+    LOG(moba::INFO) << "curtainDown" << std::endl;
     curtainState_ = CURTAIN_DOWN;
-    pthread_mutex_unlock(&mutexs[TH_CURTAIN]);
 }
 
 void Bridge::setStatusBar(Bridge::StatusBarState sbstate) {
-    LOG(tlog::Info) << "setStatusBar <" << sbstate << ">";
-    pthread_mutex_lock(&mutexs[TH_STATUS_BAR]);
+    LOG(moba::INFO) << "setStatusBar <" << sbstate << ">" << std::endl;
     statusBarState_ = sbstate;
-    pthread_mutex_unlock(&mutexs[TH_STATUS_BAR]);
 }
 
 void Bridge::mainLightOn() {
-    LOG(tlog::Info) << "mainLightOn";
-    pthread_mutex_lock(&mutexs[TH_MAINLIGHT]);
+    LOG(moba::INFO) << "mainLightOn" << std::endl;
     mainLightState_ = MAINLIGHT_ON;
-    pthread_mutex_unlock(&mutexs[TH_MAINLIGHT]);
 }
 
 void Bridge::mainLightOff() {
-    LOG(tlog::Info) << "mainLightOff";
-    pthread_mutex_lock(&mutexs[TH_MAINLIGHT]);
+    LOG(moba::INFO) << "mainLightOff" << std::endl;
     mainLightState_ = MAINLIGHT_OFF;
-    pthread_mutex_unlock(&mutexs[TH_MAINLIGHT]);
 }
 
 void Bridge::thunderstormOn() {
-    LOG(tlog::Info) << "thunderstormOn";
-    pthread_mutex_lock(&mutexs[TH_THUNDERSTORM]);
+    LOG(moba::INFO) << "thunderstormOn" << std::endl;
     thunderStormState_ = true;
-    pthread_mutex_unlock(&mutexs[TH_THUNDERSTORM]);
 }
 
 void Bridge::thunderstormOff() {
-    LOG(tlog::Info) << "thunderstormOff";
-    pthread_mutex_lock(&mutexs[TH_THUNDERSTORM]);
+    LOG(moba::INFO) << "thunderstormOff" << std::endl;
     thunderStormState_ = false;
-    pthread_mutex_unlock(&mutexs[TH_THUNDERSTORM]);
 }
 
 void Bridge::thunderstormTrigger() {
-    LOG(tlog::Info) << "thunderstormTrigger";
-    pthread_mutex_lock(&mutexs[TH_THUNDERSTORM]);
+    LOG(moba::INFO) << "thunderstormTrigger" << std::endl;
     thunderStormTrigger_ = true;
-    pthread_mutex_unlock(&mutexs[TH_THUNDERSTORM]);
+}
+
+void Bridge::setAmbientLightRed(int ratio, int ticks) {
+    LOG(moba::INFO) << "setAmbientLightRed <" << ratio << "><" << ticks << ">" << std::endl;
+    //targetRatioRed_ = ratio;
+    //tickRed_ = ticks;
+}
+
+void Bridge::setAmbientLightBlue(int ratio, int ticks) {
+    LOG(moba::INFO) << "setAmbientLightBlue <" << ratio << "><" << ticks << ">" << std::endl;
+    //targetRatioBlue_ = ratio;
+    //tickBLue_ = ticks;
+}
+
+void Bridge::setAmbientLightWhite(int ratio, int ticks) {
+    LOG(moba::INFO) << "setAmbientLightWhite <" << ratio << "><" << ticks << ">" << std::endl;
+    //targetRatioWhite_ = ratio;
+    //tickWhite_ = ticks;
 }
 
 Bridge::SwitchState Bridge::checkSwitchState() {
-    Bridge::SwitchState tmp;
-    pthread_mutex_lock(&mutexs[TH_SWITCH_STATE]);
-    tmp = switchState_;
+    Bridge::SwitchState tmp = switchState_;
     switchState_ = Bridge::SS_UNSET;
-    pthread_mutex_unlock(&mutexs[TH_SWITCH_STATE]);
     return tmp;
 }

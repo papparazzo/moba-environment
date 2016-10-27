@@ -1,12 +1,24 @@
 /*
- * File:   messageLoop.h
- * Author: stefan
+ *  Project:    moba-environment
  *
- * Created on December 12, 2015, 10:53 PM
+ *  Copyright (C) 2016 Stefan Paproth <pappi-@gmx.de>
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU Affero General Public License as
+ *  published by the Free Software Foundation, either version 3 of the
+ *  License, or (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ *  GNU Affero General Public License for more details.
+ *
+ *  You should have received a copy of the GNU Affero General Public License
+ *  along with this program. If not, see <http://www.gnu.org/licenses/agpl.txt>.
+ *
  */
 
-#ifndef MESSAGELOOP_H
-#define	MESSAGELOOP_H
+#pragma once
 
 #include <string>
 #include <boost/shared_ptr.hpp>
@@ -21,7 +33,7 @@ class MessageLoop : private boost::noncopyable {
     public:
         MessageLoop(
             const std::string &appName,
-            const Version &version,
+            const moba::Version &version,
             boost::shared_ptr<Bridge> bridge
         );
 
@@ -30,24 +42,30 @@ class MessageLoop : private boost::noncopyable {
         void connect(const std::string &host, int port);
 
     protected:
-        void printError(JsonItemPtr ptr);
+        struct AmbientLightData {
+            int red;
+            int blue;
+            int white;
+        };
+
+        void printError(moba::JsonItemPtr ptr);
         void checkSwitchState();
         void setAutoMode(bool on);
-        void setEnvironment(JsonItemPtr ptr);
-        void setAmbience(JsonItemPtr ptr);
-        void setGlobalTimer(JsonItemPtr ptr);
+        void setEnvironment(moba::JsonItemPtr ptr);
+        void globalTimerEvent(moba::JsonItemPtr ptr);
         void setHardwareState(const std::string &s);
+        void setAmbience(moba::JsonItemPtr ptr);
+        void setAmbientLight(moba::JsonItemPtr ptr);
+        void setAmbientLight();
 
         bool automatic;
 
-        MsgHandler msgHandler;
+        moba::MsgHandler msgHandler;
         long appId;
         std::string appName;
-        Version version;
+        moba::Version version;
         boost::shared_ptr<Bridge> bridge;
 
         Bridge::StatusBarState statusbarState;
+        AmbientLightData ambientLightData;
 };
-
-#endif	/* MESSAGELOOP_H */
-
