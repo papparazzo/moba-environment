@@ -44,6 +44,7 @@ class MessageLoop : private boost::noncopyable {
     protected:
         struct AmbientLightData {
             int red;
+            int green;
             int blue;
             int white;
         };

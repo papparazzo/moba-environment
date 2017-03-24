@@ -110,6 +110,16 @@ void MessageLoop::run() {
                 this->bridge->selftesting();
                 break;
 
+            case moba::Message::MT_EMERGENCY_STOP:
+                this->bridge->setEmergencyStop();
+                this->bridge->setStatusBar(Bridge::SBS_ERROR);
+                break;
+
+            case moba::Message::MT_EMERGENCY_STOP_CLEARING:
+                this->bridge->setEmergencyStopClearing();
+                this->bridge->setStatusBar(this->statusbarState);
+                break;
+
             case moba::Message::MT_SYSTEM_NOTICE: {
                 moba::JsonObjectPtr o = boost::dynamic_pointer_cast<moba::JsonObject>(msg->getData());
                 LOG(moba::INFO) << moba::castToString(o->at("type")) << ": [" <<
@@ -236,11 +246,11 @@ void MessageLoop::setAmbientLight(moba::JsonItemPtr ptr) {
     LOG(moba::NOTICE) << "setAmbientLight" << std::endl;
     boost::shared_ptr<moba::JsonNumber<int> > d;
     moba::JsonObjectPtr o = boost::dynamic_pointer_cast<moba::JsonObject>(ptr);
-    //this->ambientLightData.red = boost::dynamic_pointer_cast<moba::JsonNumber<int> >(o->at("red"));
+    this->ambientLightData.red = boost::dynamic_pointer_cast<moba::JsonNumber<int> >(o->at("red"));
     LOG(moba::NOTICE) << "red <" << this->ambientLightData.red << ">" << std::endl;
-    //this->ambientLightData.blue = boost::dynamic_pointer_cast<moba::JsonNumber<int> >(o->at("blue"));
+    this->ambientLightData.blue = boost::dynamic_pointer_cast<moba::JsonNumber<int> >(o->at("blue"));
     LOG(moba::NOTICE) << "blue <" << this->ambientLightData.blue << ">" << std::endl;
-    //this->ambientLightData.white = boost::dynamic_pointer_cast<moba::JsonNumber<int> >(o->at("white"));
+    this->ambientLightData.white = boost::dynamic_pointer_cast<moba::JsonNumber<int> >(o->at("white"));
     LOG(moba::NOTICE) << "white <" << this->ambientLightData.white << ">" << std::endl;
     if(!this->automatic) {
         this->setAmbientLight();
@@ -248,9 +258,13 @@ void MessageLoop::setAmbientLight(moba::JsonItemPtr ptr) {
 }
 
 void MessageLoop::setAmbientLight() {
-    this->bridge->setAmbientLightRed(this->ambientLightData.red, 20);
-    this->bridge->setAmbientLightBlue(this->ambientLightData.blue, 20);
-    this->bridge->setAmbientLightWhite(this->ambientLightData.white, 20);
+    this->bridge->setAmbientLight(
+        this->ambientLightData.blue,
+        this->ambientLightData.green,
+        this->ambientLightData.red,
+        this->ambientLightData.white,
+        20
+    );
 }
 
 void MessageLoop::globalTimerEvent(moba::JsonItemPtr ptr) {
@@ -258,41 +272,23 @@ void MessageLoop::globalTimerEvent(moba::JsonItemPtr ptr) {
     o->at("curModelTime");
     o->at("multiplicator");
 
-
-
     boost::shared_ptr<moba::JsonNumber<int> > i =
     boost::dynamic_pointer_cast<moba::JsonNumber<int> >(o->at("errorId"));
     moba::JsonStringPtr s = boost::dynamic_pointer_cast<moba::JsonString>(o->at("additonalMsg"));
 
-
-    // FIXME: Hier weiter machen
-/*
+    int mz;
+    int dur;
     //Sonnenaufgang   04:00; dauer 2h
-    //Sonnenuntergang 22:00; dauer 2h
     if(4 * 60 + 30 == mz) {
-
+        //blue, green, red, white, duration
+        this->bridge->setAmbientLight(500, 250, 300, dur);
+        this->bridge->setAmbientLight(500, 250, 700, dur);
     }
 
-//    this->bridge->setAmbientLightBlue();
-
-
+    //Sonnenuntergang 22:00; dauer 2h
     if(21 * 60 + 30 == mz) {
-
+        this->bridge->setAmbientLight();
     }
-/tmp/fifo0001
-
-    IPC ipc(IPC::WRITING, "/tmp/fifo.test");
-
-    for(int i = 0; i < 100; ++i) {
-        std::stringstream ss;
-        ss << i << ";" << (i * 2) << ";" << (i + 1) << ";" << i - 1 << "\n";
-        ipc.writeLine(ss.str());
-        sleep(1);
-    }
-*/
-
-
-
 }
 
 void MessageLoop::setAutoMode(bool on) {
@@ -341,4 +337,3 @@ void MessageLoop::setHardwareState(const std::string &s) {
     }
     this->bridge->setStatusBar(this->statusbarState);
 }
-

@@ -32,13 +32,10 @@
 #include <sys/resource.h>
 #include <stdlib.h>
 
-//#include <sys/types.h>
-//#include <sys/stat.h>
-//#include <fcntl.h>
-
 #include <moba/log.h>
 #include <moba/version.h>
 #include <moba/helper.h>
+#include <moba/ipc.h>
 
 #include <config.h>
 
@@ -58,7 +55,12 @@ namespace {
 }
 
 int main(int argc, char* argv[]) {
+    int key = moba::IPC::DEFAULT_KEY;
+
     switch(argc) {
+        case 4:
+            key = atoi(argv[3]);
+
         case 3:
             appData.port = atoi(argv[2]);
 
@@ -91,8 +93,8 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 */
-
-    boost::shared_ptr<Bridge> bridge(new Bridge());
+    boost::shared_ptr<moba::IPC> ipc(new moba::IPC(key, moba::IPC::TYPE_CLIENT));
+    boost::shared_ptr<Bridge> bridge(new Bridge(ipc));
 
     while(true) {
         try {
@@ -107,4 +109,3 @@ int main(int argc, char* argv[]) {
         }
     }
 }
-

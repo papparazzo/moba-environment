@@ -61,52 +61,28 @@
 
 namespace {
 
-    /*
-    enum PinOutputMapping {
-        FLASH_3      = 29,       // PIN 40
-        FLASH_2      = 28,       // PIN 38
-        FLASH_1      = 25,       // PIN 37
-        STATUS_RED   = 27,       // PIN 36
-        STATUS_GREEN = 24,       // PIN 35
-        MAIN_LIGHT   = 23,       // PIN 33
-        CURTAIN_ON   = 26,       // PIN 32
-        CURTAIN_DIR  = 22,       // PIN 31
-        SHUTDOWN     = 21,       // PIN 29
-
-        AUX_3        = 4,        // PIN 16
-        AUX_2        = 3,        // PIN 15
-        AUX_1        = 2,        // PIN 13
-    };
-
     enum PinInputMapping {
-        PUSH_BUTTON_STATE = 0,   // PIN 12
-        LIGHT_STATE       = 1,  // PIN 11
+        PUSH_BUTTON_STATE = 29,  // PIN 40
+        LIGHT_STATE       = 28,  // PIN 38
     };
-     */
-
-
 
     enum PinOutputMapping {
-        AUX_3        = 4,        // PIN 16
-        AUX_2        = 5,        // PIN 18
-        AUX_1        = 12,       // PIN 19
-
-        FLASH_1      = 13,       // PIN 21
-        FLASH_2      = 6,        // PIN 22
-        FLASH_3      = 14,       // PIN 23
-
-        SHUTDOWN     = 21,       // PIN 29
-        CURTAIN_DIR  = 22,       // PIN 31
-        CURTAIN_ON   = 26,       // PIN 32
-        MAIN_LIGHT   = 23,       // PIN 33
-
         STATUS_GREEN = 24,       // PIN 35
         STATUS_RED   = 27,       // PIN 36
-    };
 
-    enum PinInputMapping {
-        PUSH_BUTTON_STATE = 25,   // PIN 37
-        LIGHT_STATE       = 28,   // PIN 38
+        SHUTDOWN     = 23,       // PIN 33
+        MAIN_LIGHT   = 26,       // PIN 32
+
+        CURTAIN_DIR  = 22,       // PIN 31
+        CURTAIN_ON   = 21,       // PIN 29
+
+        AUX_1        = 5,        // PIN 18
+        AUX_2        = 4,        // PIN 16
+        AUX_3        = 3,        // PIN 15
+
+        FLASH_1      = 2,        // PIN 13
+        FLASH_2      = 1,        // PIN 12
+        FLASH_3      = 0,        // PIN 11
     };
 
     enum CurtainState {
@@ -156,6 +132,7 @@ namespace {
         TH_THUNDERSTORM,
         TH_AUX,
         TH_SWITCH_STATE,
+        TH_SELF_TESTING,
         TH_LAST
     };
 
@@ -298,13 +275,11 @@ namespace {
             thunderStormTrigger_ = false;
 
             int f = flashPins[rand() % 3];
-            for(int i = 0; i < 33; ++i) {
-                digitalWrite(f, HIGH);
-                delay(rand() % 15);
-                digitalWrite(f, LOW);
-                delay(rand() % 15);
-            }
+            digitalWrite(f, HIGH);
+            delay(500);
+            digitalWrite(f, LOW);
             delay(rand() % 800 + 200);
+            // FIXME no hard-coded path
             system(std::string(std::string("mpg123 ../../cpp/Environment/data/") + thunder[rand() % 5]).c_str());
             sleep(rand() % 25);
         }
@@ -393,57 +368,67 @@ namespace {
             switchState_ = Bridge::SS_SHORT_TWICE;
         }
     }
-/* FIXME hier weiter machen...
-    void *environmentLight_(void *) {
-        while(running) {
 
-        }
-    }
-
-    /** /
     void *selftesting_(void *) {
+        sleep(2);
         digitalWrite(STATUS_RED,   HIGH);
         digitalWrite(STATUS_GREEN, HIGH);
 
-        for(int i = 0; i < 5; ++i) {
-
+        for(int i = 0; i < 3; ++i) {
             digitalWrite(FLASH_1, HIGH);
-            digitalWrite(FLASH_2, HIGH);
-            digitalWrite(FLASH_3, HIGH);
+            digitalWrite(AUX_1,   HIGH);
             delay(500);
-
             digitalWrite(FLASH_1, LOW);
-            digitalWrite(FLASH_2, LOW);
-            digitalWrite(FLASH_3, LOW);
+            digitalWrite(AUX_1,   LOW);
             delay(500);
-
-            digitalWrite(MAIN_LIGHT,   HIGH);
-            delay(500);
-            digitalWrite(MAIN_LIGHT,   LOW);
-            delay(1500);
-            digitalWrite(MAIN_LIGHT,   HIGH);
-            delay(500);
-            digitalWrite(MAIN_LIGHT,   LOW);
         }
+        sleep(3);
+        for(int i = 0; i < 3; ++i) {
+            digitalWrite(FLASH_2, HIGH);
+            digitalWrite(AUX_2,   HIGH);
+            delay(500);
+            digitalWrite(FLASH_2, LOW);
+            digitalWrite(AUX_2,   LOW);
+            delay(500);
+        }
+        sleep(3);
+        for(int i = 0; i < 3; ++i) {
+            digitalWrite(FLASH_3, HIGH);
+            digitalWrite(AUX_3,   HIGH);
+            delay(500);
+            digitalWrite(FLASH_3, LOW);
+            digitalWrite(AUX_3,   LOW);
+            delay(500);
+        }
+        sleep(3);
 
+        digitalWrite(MAIN_LIGHT,   HIGH);
+        delay(500);
+        digitalWrite(MAIN_LIGHT,   LOW);
+        delay(1500);
+        digitalWrite(MAIN_LIGHT,   HIGH);
+        delay(500);
+        digitalWrite(MAIN_LIGHT,   LOW);
 
-    //pinMode(CURTAIN_DIR,       OUTPUT);
-    //pinMode(CURTAIN_ON,        OUTPUT);
+        for(int i = 0; i < 2; ++i) {
+            if(i) {
+                digitalWrite(CURTAIN_DIR, HIGH);
+            } else {
+                digitalWrite(CURTAIN_DIR, LOW);
+            }
+            digitalWrite(CURTAIN_ON, HIGH);
+            sleep(3);
+            digitalWrite(CURTAIN_ON, LOW);
+            digitalWrite(CURTAIN_DIR, LOW);
 
-
-    //pinMode(AUX_1,             OUTPUT);
-    //pinMode(AUX_2,             OUTPUT);
-    //pinMode(AUX_3,             OUTPUT);
-
-
+        }
         digitalWrite(STATUS_RED,   LOW);
         digitalWrite(STATUS_GREEN, LOW);
         selftestRunning_ = false;
     }
- //*/
 }
 
-Bridge::Bridge() {
+Bridge::Bridge( boost::shared_ptr<moba::IPC> ipc) : ipc(ipc) {
     srand(time(NULL));
     wiringPiSetup();
     pinMode(CURTAIN_DIR,       OUTPUT);
@@ -462,12 +447,13 @@ Bridge::Bridge() {
     pinMode(LIGHT_STATE,       INPUT);
     pinMode(PUSH_BUTTON_STATE, INPUT);
 
-    pthread_create(&th[TH_CURTAIN], NULL, curtain_, NULL);
-    pthread_create(&th[TH_STATUS_BAR], NULL, statusBar_, NULL);
-    pthread_create(&th[TH_MAINLIGHT], NULL, mainLight_, NULL);
-    pthread_create(&th[TH_THUNDERSTORM], NULL, thunderStorm_, NULL);
-    pthread_create(&th[TH_AUX], NULL, aux_, NULL);
+    pthread_create(&th[TH_CURTAIN     ], NULL, curtain_,            NULL);
+    pthread_create(&th[TH_STATUS_BAR  ], NULL, statusBar_,          NULL);
+    pthread_create(&th[TH_MAINLIGHT   ], NULL, mainLight_,          NULL);
+    pthread_create(&th[TH_THUNDERSTORM], NULL, thunderStorm_,       NULL);
+    pthread_create(&th[TH_AUX         ], NULL, aux_,                NULL);
     pthread_create(&th[TH_SWITCH_STATE], NULL, switchStateChecker_, NULL);
+    pthread_create(&th[TH_SELF_TESTING], NULL, selftesting_,        NULL);
 
     for(int i = 0; i < TH_LAST; ++i) {
         pthread_detach(th[i]);
@@ -484,6 +470,7 @@ Bridge::~Bridge() {
 
 void Bridge::selftesting() {
     LOG(moba::INFO) << "selftesting" << std::endl;
+    this->ipc->send("", moba::IPC::CMD_TEST);
     selftestRunning_ = true;
 }
 
@@ -555,26 +542,23 @@ void Bridge::thunderstormTrigger() {
     thunderStormTrigger_ = true;
 }
 
-void Bridge::setAmbientLightRed(int ratio, int ticks) {
-    LOG(moba::INFO) << "setAmbientLightRed <" << ratio << "><" << ticks << ">" << std::endl;
-    //targetRatioRed_ = ratio;
-    //tickRed_ = ticks;
-}
-
-void Bridge::setAmbientLightBlue(int ratio, int ticks) {
-    LOG(moba::INFO) << "setAmbientLightBlue <" << ratio << "><" << ticks << ">" << std::endl;
-    //targetRatioBlue_ = ratio;
-    //tickBLue_ = ticks;
-}
-
-void Bridge::setAmbientLightWhite(int ratio, int ticks) {
-    LOG(moba::INFO) << "setAmbientLightWhite <" << ratio << "><" << ticks << ">" << std::endl;
-    //targetRatioWhite_ = ratio;
-    //tickWhite_ = ticks;
-}
-
 Bridge::SwitchState Bridge::checkSwitchState() {
     Bridge::SwitchState tmp = switchState_;
     switchState_ = Bridge::SS_UNSET;
     return tmp;
+}
+
+void Bridge::setEmergencyStop() {
+    this->ipc->send("", moba::IPC::CMD_EMERGENCY_STOP);
+}
+
+void Bridge::setEmergencyStopClearing() {
+    this->ipc->send("", moba::IPC::CMD_EMERGENCY_RELEASE);
+}
+
+void Bridge::setAmbientLight(int blue, int green, int red, int white, int duration) {
+    LOG(moba::INFO) << "setAmbientLight <" << blue << "><" << green << "><" << red << "><" << white << "><" << duration << ">" << std::endl;
+    std::stringstream ss;
+    ss << blue << ";" << green << ";" << red << ";" << white << ";" << duration;
+    this->ipc->send(ss.str(), moba::IPC::CMD_RUN);
 }

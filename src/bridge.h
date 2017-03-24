@@ -20,16 +20,21 @@
 
 #pragma once
 
-class Bridge {
+#include <boost/shared_ptr.hpp>
+#include <boost/noncopyable.hpp>
+
+#include <moba/ipc.h>
+
+class Bridge : private boost::noncopyable {
     public:
         enum StatusBarState {
             SBS_ERROR          = 0,   // rot blitz
             SBS_INIT           = 1,   // rot
             SBS_POWER_OFF      = 2,   // rot blink
 
-            SBS_STANDBY        = 3,   // grün blitz
-            SBS_READY          = 4,   // grün
-            SBS_AUTOMATIC      = 5    // grün blink
+            SBS_STANDBY        = 3,   // gruen blitz
+            SBS_READY          = 4,   // gruen
+            SBS_AUTOMATIC      = 5    // gruen blink
         };
 
         enum AuxPin {
@@ -45,7 +50,7 @@ class Bridge {
             SS_LONG_ONCE
         };
 
-        Bridge();
+        Bridge( boost::shared_ptr<moba::IPC> ipc);
         virtual ~Bridge();
 
         void curtainUp();
@@ -67,13 +72,14 @@ class Bridge {
         void setStatusBar(StatusBarState sbstate);
 
         void selftesting();
-        void setAmbientLightRed(int ratio, int ticks = 200);
-        void setAmbientLightBlue(int ratio, int ticks = 200);
-        void setAmbientLightWhite(int ratio, int ticks = 200);
+        void setAmbientLight(int blue, int green, int red, int white, int ratio);
+
+        void setEmergencyStop();
+        void setEmergencyStopClearing();
 
         SwitchState checkSwitchState();
 
-    private:
-        Bridge(const Bridge& orig);
+    protected:
+        boost::shared_ptr<moba::IPC> ipc;
 };
 
