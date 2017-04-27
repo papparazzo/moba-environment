@@ -59,6 +59,7 @@ void MessageLoop::run() {
 
         moba::MessagePtr msg = this->msgHandler.recieveMsg();
         if(!msg) {
+            usleep(50000);
             continue;
         }
         LOG(moba::NOTICE) << "New Message <" << *msg << ">" << std::endl;
