@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <string>
+#include <sstream>
 #include <pthread.h>
 
 #include <moba/log.h>

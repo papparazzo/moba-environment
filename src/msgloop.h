@@ -26,7 +26,7 @@
 
 #include "bridge.h"
 
-#include <moba/msghandler.h>
+#include <moba/msgendpoint.h>
 #include <moba/log.h>
 
 class MessageLoop : private boost::noncopyable {
@@ -34,12 +34,13 @@ class MessageLoop : private boost::noncopyable {
         MessageLoop(
             const std::string &appName,
             const moba::Version &version,
-            boost::shared_ptr<Bridge> bridge
+            boost::shared_ptr<Bridge> bridge,
+            moba::MsgEndpointPtr
         );
 
         void run();
         void init();
-        void connect(const std::string &host, int port);
+        void connect();
 
     protected:
         struct AmbientLightData {
@@ -61,7 +62,7 @@ class MessageLoop : private boost::noncopyable {
 
         bool automatic;
 
-        moba::MsgHandler msgHandler;
+        moba::MsgEndpointPtr msgEndpoint;
         long appId;
         std::string appName;
         moba::Version version;

@@ -95,11 +95,12 @@ int main(int argc, char* argv[]) {
 */
     boost::shared_ptr<moba::IPC> ipc(new moba::IPC(key, moba::IPC::TYPE_CLIENT));
     boost::shared_ptr<Bridge> bridge(new Bridge(ipc));
+    moba::MsgEndpointPtr endpoint(new moba::MsgEndpoint(appData.host, appData.port));
 
     while(true) {
         try {
-            MessageLoop loop(appData.appName, appData.version, bridge);
-            loop.connect(appData.host, appData.port);
+            MessageLoop loop(appData.appName, appData.version, bridge, endpoint);
+            loop.connect();
             loop.init();
             loop.run();
             exit(EXIT_SUCCESS);
