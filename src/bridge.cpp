@@ -471,7 +471,7 @@ Bridge::~Bridge() {
 
 void Bridge::selftesting() {
     LOG(moba::INFO) << "selftesting" << std::endl;
-    this->ipc->send("", moba::IPC::CMD_TEST);
+    ipc->send("", moba::IPC::CMD_TEST);
     selftestRunning_ = true;
 }
 
@@ -550,16 +550,16 @@ Bridge::SwitchState Bridge::checkSwitchState() {
 }
 
 void Bridge::setEmergencyStop() {
-    this->ipc->send("", moba::IPC::CMD_EMERGENCY_STOP);
+    ipc->send("", moba::IPC::CMD_EMERGENCY_STOP);
 }
 
 void Bridge::setEmergencyStopClearing() {
-    this->ipc->send("", moba::IPC::CMD_EMERGENCY_RELEASE);
+    ipc->send("", moba::IPC::CMD_EMERGENCY_RELEASE);
 }
 
 void Bridge::setAmbientLight(int blue, int green, int red, int white, int duration) {
     LOG(moba::INFO) << "setAmbientLight <" << blue << "><" << green << "><" << red << "><" << white << "><" << duration << ">" << std::endl;
     std::stringstream ss;
     ss << blue << ";" << green << ";" << red << ";" << white << ";" << duration;
-    this->ipc->send(ss.str(), moba::IPC::CMD_RUN);
+    ipc->send(ss.str(), moba::IPC::CMD_RUN);
 }
