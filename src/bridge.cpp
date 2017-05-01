@@ -530,11 +530,13 @@ void Bridge::mainLightOff() {
 
 void Bridge::thunderstormOn() {
     LOG(moba::INFO) << "thunderstormOn" << std::endl;
+    // FIXME ipc->send("", moba::IPC::CMD_EMERGENCY_STOP);
     thunderStormState_ = true;
 }
 
 void Bridge::thunderstormOff() {
     LOG(moba::INFO) << "thunderstormOff" << std::endl;
+    // FIXME ipc->send("", moba::IPC::CMD_EMERGENCY_STOP);
     thunderStormState_ = false;
 }
 

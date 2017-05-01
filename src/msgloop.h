@@ -39,7 +39,6 @@ class MessageLoop : private boost::noncopyable {
         );
 
         void run();
-        void init();
         void connect();
 
     protected:

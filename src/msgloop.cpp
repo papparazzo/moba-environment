@@ -144,9 +144,7 @@ void MessageLoop::connect() {
 
     appId = msgEndpoint->connect(appName, version, groups);
     LOG(moba::NOTICE) << "AppId <" << appId << ">" << std::endl;
-}
 
-void MessageLoop::init() {
     msgEndpoint->sendMsg(moba::Message::MT_GET_HARDWARE_STATE);
     msgEndpoint->sendMsg(moba::Message::MT_GET_AUTO_MODE);
     msgEndpoint->sendMsg(moba::Message::MT_GET_AMBIENT_LIGHT);
@@ -276,15 +274,13 @@ void MessageLoop::globalTimerEvent(moba::JsonItemPtr ptr) {
     int dur;
     //Sonnenaufgang   04:00; dauer 2h
     if(4 * 60 + 30 == mz) {
-        // TODO: Hier weiter machen...
         //blue, green, red, white, duration
-        //bridge->setAmbientLight(500, 250, 300, dur);
-        //bridge->setAmbientLight(500, 250, 700, dur);
+        bridge->setAmbientLight(500, 250, 700, dur);
     }
 
     //Sonnenuntergang 22:00; dauer 2h
     if(21 * 60 + 30 == mz) {
-        //bridge->setAmbientLight();
+        bridge->setAmbientLight(500, 250, 700, dur);
     }
 }
 

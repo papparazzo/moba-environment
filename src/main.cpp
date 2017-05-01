@@ -101,7 +101,6 @@ int main(int argc, char* argv[]) {
         try {
             MessageLoop loop(appData.appName, appData.version, bridge, endpoint);
             loop.connect();
-            loop.init();
             loop.run();
             exit(EXIT_SUCCESS);
         } catch(std::exception &e) {
