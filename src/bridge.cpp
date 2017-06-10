@@ -337,7 +337,7 @@ namespace {
 
             int cntOn = 0;
             int cntOff = 0;
-            while(digitalRead(PUSH_BUTTON_STATE)) {
+            while(!digitalRead(PUSH_BUTTON_STATE)) {
                 cntOn++;
                 if(cntOn > 2000) {
                     break;
@@ -354,7 +354,7 @@ namespace {
                 continue;
             }
 
-            while(!digitalRead(PUSH_BUTTON_STATE)) {
+            while(digitalRead(PUSH_BUTTON_STATE)) {
                 cntOff++;
                 if(cntOff > 500) {
                     break;
