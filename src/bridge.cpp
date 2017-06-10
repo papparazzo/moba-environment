@@ -63,8 +63,8 @@
 namespace {
 
     enum PinInputMapping {
-        PUSH_BUTTON_STATE = 29,  // PIN 40
-        LIGHT_STATE       = 28,  // PIN 38
+        LIGHT_STATE       = 29,  // PIN 40
+        PUSH_BUTTON_STATE = 28,  // PIN 38
     };
 
     enum PinOutputMapping {
