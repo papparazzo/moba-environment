@@ -249,10 +249,10 @@ namespace {
             if(mal == MAINLIGHT_IDLE) {
                 continue;
             }
-            if(digitalRead(LIGHT_STATE) && mal == MAINLIGHT_ON) {
+            if(!digitalRead(LIGHT_STATE) && mal == MAINLIGHT_ON) {
                 continue;
             }
-            if(!digitalRead(LIGHT_STATE) && mal == MAINLIGHT_OFF) {
+            if(digitalRead(LIGHT_STATE) && mal == MAINLIGHT_OFF) {
                 continue;
             }
             digitalWrite(MAIN_LIGHT, HIGH);
