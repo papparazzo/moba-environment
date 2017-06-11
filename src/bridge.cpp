@@ -141,6 +141,17 @@ namespace {
 
     moba::Atomic<bool> running = true;
 
+    bool debouncedInputRead(int pin) {
+        int j = 0;
+        for(int i = 0; i < 6; ++i) {
+            if(digitalRead(pin)) {
+                ++j;
+            }
+            delay(10);
+        }
+        return j > 3;
+    }
+
     void *statusBar_(void *) {
         while(running) {
             if(selftestRunning_) {
@@ -249,10 +260,10 @@ namespace {
             if(mal == MAINLIGHT_IDLE) {
                 continue;
             }
-            if(!digitalRead(LIGHT_STATE) && mal == MAINLIGHT_ON) {
+            if(!debouncedInputRead(LIGHT_STATE) && mal == MAINLIGHT_ON) {
                 continue;
             }
-            if(digitalRead(LIGHT_STATE) && mal == MAINLIGHT_OFF) {
+            if(debouncedInputRead(LIGHT_STATE) && mal == MAINLIGHT_OFF) {
                 continue;
             }
             digitalWrite(MAIN_LIGHT, HIGH);
@@ -337,7 +348,7 @@ namespace {
 
             int cntOn = 0;
             int cntOff = 0;
-            while(!digitalRead(PUSH_BUTTON_STATE)) {
+            while(!debouncedInputRead(PUSH_BUTTON_STATE)) {
                 cntOn++;
                 if(cntOn > 2000) {
                     break;
@@ -354,7 +365,7 @@ namespace {
                 continue;
             }
 
-            while(digitalRead(PUSH_BUTTON_STATE)) {
+            while(debouncedInputRead(PUSH_BUTTON_STATE)) {
                 cntOff++;
                 if(cntOff > 500) {
                     break;
