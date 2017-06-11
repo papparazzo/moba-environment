@@ -228,9 +228,9 @@ namespace {
             }
             currentCurtainState = curtainState_;
 
-            int dir = LOW;
+            int dir = HIGH;
             if(currentCurtainState == CURTAIN_UP) {
-                dir = HIGH;
+                dir = LOW;
             }
             digitalWrite(CURTAIN_ON, HIGH);
             digitalWrite(CURTAIN_DIR, dir);
