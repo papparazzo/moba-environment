@@ -371,61 +371,67 @@ namespace {
     }
 
     void *selftesting_(void *) {
-        sleep(2);
-        digitalWrite(STATUS_RED,   HIGH);
-        digitalWrite(STATUS_GREEN, HIGH);
-
-        for(int i = 0; i < 3; ++i) {
-            digitalWrite(FLASH_1, HIGH);
-            digitalWrite(AUX_1,   HIGH);
-            delay(500);
-            digitalWrite(FLASH_1, LOW);
-            digitalWrite(AUX_1,   LOW);
-            delay(500);
-        }
-        sleep(3);
-        for(int i = 0; i < 3; ++i) {
-            digitalWrite(FLASH_2, HIGH);
-            digitalWrite(AUX_2,   HIGH);
-            delay(500);
-            digitalWrite(FLASH_2, LOW);
-            digitalWrite(AUX_2,   LOW);
-            delay(500);
-        }
-        sleep(3);
-        for(int i = 0; i < 3; ++i) {
-            digitalWrite(FLASH_3, HIGH);
-            digitalWrite(AUX_3,   HIGH);
-            delay(500);
-            digitalWrite(FLASH_3, LOW);
-            digitalWrite(AUX_3,   LOW);
-            delay(500);
-        }
-        sleep(3);
-
-        digitalWrite(MAIN_LIGHT,   HIGH);
-        delay(500);
-        digitalWrite(MAIN_LIGHT,   LOW);
-        delay(1500);
-        digitalWrite(MAIN_LIGHT,   HIGH);
-        delay(500);
-        digitalWrite(MAIN_LIGHT,   LOW);
-
-        for(int i = 0; i < 2; ++i) {
-            if(i) {
-                digitalWrite(CURTAIN_DIR, HIGH);
-            } else {
-                digitalWrite(CURTAIN_DIR, LOW);
+        while(running) {
+            if(!selftestRunning_) {
+                delay(500);
+                continue;
             }
-            digitalWrite(CURTAIN_ON, HIGH);
-            sleep(3);
-            digitalWrite(CURTAIN_ON, LOW);
-            digitalWrite(CURTAIN_DIR, LOW);
+            sleep(1);
+            digitalWrite(STATUS_RED,   HIGH);
+            digitalWrite(STATUS_GREEN, HIGH);
 
+            for(int i = 0; i < 3; ++i) {
+                digitalWrite(FLASH_1, HIGH);
+                digitalWrite(AUX_1,   HIGH);
+                delay(500);
+                digitalWrite(FLASH_1, LOW);
+                digitalWrite(AUX_1,   LOW);
+                delay(500);
+            }
+            sleep(3);
+            for(int i = 0; i < 3; ++i) {
+                digitalWrite(FLASH_2, HIGH);
+                digitalWrite(AUX_2,   HIGH);
+                delay(500);
+                digitalWrite(FLASH_2, LOW);
+                digitalWrite(AUX_2,   LOW);
+                delay(500);
+            }
+            sleep(3);
+            for(int i = 0; i < 3; ++i) {
+                digitalWrite(FLASH_3, HIGH);
+                digitalWrite(AUX_3,   HIGH);
+                delay(500);
+                digitalWrite(FLASH_3, LOW);
+                digitalWrite(AUX_3,   LOW);
+                delay(500);
+            }
+            sleep(3);
+
+            digitalWrite(MAIN_LIGHT,   HIGH);
+            delay(500);
+            digitalWrite(MAIN_LIGHT,   LOW);
+            delay(1500);
+            digitalWrite(MAIN_LIGHT,   HIGH);
+            delay(500);
+            digitalWrite(MAIN_LIGHT,   LOW);
+
+            for(int i = 0; i < 2; ++i) {
+                if(i) {
+                    digitalWrite(CURTAIN_DIR, HIGH);
+                } else {
+                    digitalWrite(CURTAIN_DIR, LOW);
+                }
+                digitalWrite(CURTAIN_ON, HIGH);
+                sleep(3);
+                digitalWrite(CURTAIN_ON, LOW);
+                digitalWrite(CURTAIN_DIR, LOW);
+
+            }
+            digitalWrite(STATUS_RED,   LOW);
+            digitalWrite(STATUS_GREEN, LOW);
+            selftestRunning_ = false;
         }
-        digitalWrite(STATUS_RED,   LOW);
-        digitalWrite(STATUS_GREEN, LOW);
-        selftestRunning_ = false;
     }
 }
 
