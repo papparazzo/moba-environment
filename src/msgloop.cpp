@@ -153,8 +153,8 @@ void MessageLoop::connect() {
 void MessageLoop::printError(moba::JsonItemPtr ptr) {
     moba::JsonObjectPtr o = boost::dynamic_pointer_cast<moba::JsonObject>(ptr);
 
-    boost::shared_ptr<moba::JsonNumber<int> > i =
-    boost::dynamic_pointer_cast<moba::JsonNumber<int> >(o->at("errorId"));
+    boost::shared_ptr<moba::JsonNumber<long int> > i =
+    boost::dynamic_pointer_cast<moba::JsonNumber<long int> >(o->at("errorId"));
     moba::JsonStringPtr s = boost::dynamic_pointer_cast<moba::JsonString>(o->at("additonalMsg"));
     LOG(moba::WARNING) << "ErrorId <" << i << "> " << s << std::endl;
 }
@@ -238,13 +238,12 @@ void MessageLoop::setAmbience(moba::JsonItemPtr ptr) {
 
 void MessageLoop::setAmbientLight(moba::JsonItemPtr ptr) {
     LOG(moba::NOTICE) << "setAmbientLight" << std::endl;
-    boost::shared_ptr<moba::JsonNumber<int> > d;
     moba::JsonObjectPtr o = boost::dynamic_pointer_cast<moba::JsonObject>(ptr);
-    ambientLightData.red = boost::dynamic_pointer_cast<moba::JsonNumber<int> >(o->at("red"))->getVal();
+    ambientLightData.red = boost::dynamic_pointer_cast<moba::JsonNumber<long int> >(o->at("red"))->getVal();
     LOG(moba::NOTICE) << "red <" << ambientLightData.red << ">" << std::endl;
-    ambientLightData.blue = boost::dynamic_pointer_cast<moba::JsonNumber<int> >(o->at("blue"))->getVal();
+    ambientLightData.blue = boost::dynamic_pointer_cast<moba::JsonNumber<long int> >(o->at("blue"))->getVal();
     LOG(moba::NOTICE) << "blue <" << ambientLightData.blue << ">" << std::endl;
-    ambientLightData.white = boost::dynamic_pointer_cast<moba::JsonNumber<int> >(o->at("white"))->getVal();
+    ambientLightData.white = boost::dynamic_pointer_cast<moba::JsonNumber<long int> >(o->at("white"))->getVal();
     LOG(moba::NOTICE) << "white <" << ambientLightData.white << ">" << std::endl;
     if(!automatic) {
         setAmbientLight();
@@ -266,8 +265,8 @@ void MessageLoop::globalTimerEvent(moba::JsonItemPtr ptr) {
     o->at("curModelTime");
     o->at("multiplicator");
 
-    boost::shared_ptr<moba::JsonNumber<int> > i =
-    boost::dynamic_pointer_cast<moba::JsonNumber<int> >(o->at("errorId"));
+    boost::shared_ptr<moba::JsonNumber<long int> > i =
+    boost::dynamic_pointer_cast<moba::JsonNumber<long int> >(o->at("errorId"));
     moba::JsonStringPtr s = boost::dynamic_pointer_cast<moba::JsonString>(o->at("additonalMsg"));
 
     int mz;
@@ -275,12 +274,12 @@ void MessageLoop::globalTimerEvent(moba::JsonItemPtr ptr) {
     //Sonnenaufgang   04:00; dauer 2h
     if(4 * 60 + 30 == mz) {
         //blue, green, red, white, duration
-        bridge->setAmbientLight(500, 250, 700, dur);
+        //bridge->setAmbientLight(500, 250, 700, dur);
     }
 
     //Sonnenuntergang 22:00; dauer 2h
     if(21 * 60 + 30 == mz) {
-        bridge->setAmbientLight(500, 250, 700, dur);
+        //bridge->setAmbientLight(500, 250, 700, dur);
     }
 }
 
