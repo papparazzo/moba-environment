@@ -147,7 +147,7 @@ namespace {
             if(digitalRead(pin)) {
                 ++j;
             }
-            delay(10);
+            delayMicroseconds(25);
         }
         return j > 3;
     }
