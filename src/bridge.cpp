@@ -531,7 +531,7 @@ void Bridge::curtainDown() {
 }
 
 void Bridge::setStatusBar(Bridge::StatusBarState sbstate) {
-    LOG(moba::INFO) << "setStatusBar <" << sbstate << ">" << std::endl;
+    LOG(moba::INFO) << "setStatusBar <" << getStatusbarClearText(sbstate) << ">" << std::endl;
     statusBarState_ = sbstate;
 }
 
@@ -586,4 +586,26 @@ void Bridge::setAmbientLight(int blue, int green, int red, int white, int durati
         4096.0 * white / 100 << ";" << duration;
     LOG(moba::INFO) << "sending " << ss.str() << std::endl;
     ipc->send(ss.str(), moba::IPC::CMD_RUN);
+}
+
+std::string Bridge::getStatusbarClearText(Bridge::StatusBarState statusbar) {
+    switch(statusbar) {
+        case SBS_ERROR:
+            return "SBS_ERROR";
+
+        case SBS_INIT:
+            return "SBS_INIT";
+
+        case SBS_POWER_OFF:
+            return "SBS_POWER_OFF";
+
+        case SBS_STANDBY:
+            return "SBS_STANDBY";
+
+        case SBS_READY:
+            return "SBS_READY";
+
+        case SBS_AUTOMATIC:
+            return "SBS_AUTOMATIC";
+    }
 }

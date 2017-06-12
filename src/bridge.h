@@ -50,7 +50,7 @@ class Bridge : private boost::noncopyable {
             SS_LONG_ONCE
         };
 
-        Bridge( boost::shared_ptr<moba::IPC> ipc);
+        Bridge(boost::shared_ptr<moba::IPC> ipc);
         virtual ~Bridge();
 
         void curtainUp();
@@ -81,5 +81,5 @@ class Bridge : private boost::noncopyable {
 
     protected:
         boost::shared_ptr<moba::IPC> ipc;
+        std::string getStatusbarClearText(StatusBarState statusbar);
 };
-
