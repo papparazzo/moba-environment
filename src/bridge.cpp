@@ -579,6 +579,11 @@ void Bridge::setEmergencyStopClearing() {
 void Bridge::setAmbientLight(int blue, int green, int red, int white, int duration) {
     LOG(moba::INFO) << "setAmbientLight <" << blue << "><" << green << "><" << red << "><" << white << "><" << duration << ">" << std::endl;
     std::stringstream ss;
-    ss << blue << ";" << green << ";" << red << ";" << white << ";" << duration;
+    ss <<
+        4096.0 * blue / 100 << ";" <<
+        4096.0 * green / 100 << ";" <<
+        4096.0 * red / 100 << ";" <<
+        4096.0 * white / 100 << ";" << duration;
+    LOG(moba::INFO) << "sending " << ss.str() << std::endl;
     ipc->send(ss.str(), moba::IPC::CMD_RUN);
 }
