@@ -23,6 +23,13 @@ AC_CHECK_HEADERS([unistd.h])
 AC_CHECK_HEADER_STDBOOL
 
 # Checks for library functions.
-
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
+
+AC_CHECK_PROG([MOBA_SHUTDOWN],[moba-shutdown],[yes],[no])
+AM_CONDITIONAL([FOUND_MOBA_SHUTDOWN], [test "x$MOBA_SHUTDOWN" = xyes])
+AM_COND_IF([FOUND_MOBA_SHUTDOWN],,[AC_MSG_ERROR([required program 'moba-shutdown' not found...])])
+
+AC_CHECK_PROG([MOBA_AMBILIGHT],[moba-ambilight],[yes],[no])
+AM_CONDITIONAL([FOUND_MOBA_AMBILIGHT], [test "x$MOBA_AMBILIGHT" = xyes])
+AM_COND_IF([FOUND_MOBA_AMBILIGHT],,[AC_MSG_ERROR([required program 'moba-ambilight' not found...])])
