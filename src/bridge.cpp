@@ -494,15 +494,12 @@ void Bridge::selftesting() {
 
 void Bridge::shutdown() {
     LOG(moba::INFO) << "shutdown" << std::endl;
-    digitalWrite(SHUTDOWN, HIGH);
-    sleep(2);
-    digitalWrite(SHUTDOWN, LOW);
-    execl("/sbin/shutdown", "shutdown", "-h", "now", NULL);
+    execl("/usr/local/bin/moba-shutdown", "moba-shutdown", "-p", "23", (char *)NULL);
 }
 
 void Bridge::reboot() {
     LOG(moba::INFO) << "reboot" << std::endl;
-    execl("/sbin/shutdown", "shutdown", "-r", "now", NULL);
+    execl("/usr/local/bin/moba-shutdown", "moba-shutdown", "-r", (char *)NULL);
 }
 
 void Bridge::auxOn(AuxPin nb) {
