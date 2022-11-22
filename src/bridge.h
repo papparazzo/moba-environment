@@ -23,7 +23,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/noncopyable.hpp>
 
-#include <moba/ipc.h>
+#include <moba-common/ipc.h>
 
 class Bridge : private boost::noncopyable {
     public:
@@ -50,7 +50,7 @@ class Bridge : private boost::noncopyable {
             SS_LONG_ONCE
         };
 
-        Bridge(boost::shared_ptr<moba::IPC> ipc);
+        Bridge(boost::shared_ptr<moba::common::IPC> ipc);
         virtual ~Bridge();
 
         void curtainUp();
@@ -80,6 +80,6 @@ class Bridge : private boost::noncopyable {
         SwitchState checkSwitchState();
 
     protected:
-        boost::shared_ptr<moba::IPC> ipc;
+        boost::shared_ptr<moba::common::IPC> ipc;
         std::string getStatusbarClearText(StatusBarState statusbar);
 };

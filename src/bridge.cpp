@@ -26,8 +26,8 @@
 #include <sstream>
 #include <pthread.h>
 
-#include <moba/log.h>
-#include <moba/atomic.h>
+#include <moba-common/log.h>
+#include <moba-common/atomic.h>
 
 #include "bridge.h"
 
@@ -116,15 +116,15 @@ namespace {
         "thunder4.mp3",
     };
 
-    moba::Atomic<Bridge::StatusBarState> statusBarState_ = Bridge::SBS_INIT;
-    moba::Atomic<Bridge::SwitchState> switchState_       = Bridge::SS_UNSET;
-    moba::Atomic<CurtainState> curtainState_             = CURTAIN_STOP;
-    moba::Atomic<MainLightState> mainLightState_         = MAINLIGHT_IDLE;
-    moba::Atomic<AuxState> auxPinState_[]                = {AUX_OFF, AUX_OFF, AUX_OFF};
-    moba::Atomic<bool> auxPinTrigger_[]                  = {false, false, false};
-    moba::Atomic<bool> thunderStormState_                = false;
-    moba::Atomic<bool> thunderStormTrigger_              = false;
-    moba::Atomic<bool> selftestRunning_                  = false;
+    moba::common::Atomic<Bridge::StatusBarState> statusBarState_ = Bridge::SBS_INIT;
+    moba::common::Atomic<Bridge::SwitchState> switchState_       = Bridge::SS_UNSET;
+    moba::common::Atomic<CurtainState> curtainState_             = CURTAIN_STOP;
+    moba::common::Atomic<MainLightState> mainLightState_         = MAINLIGHT_IDLE;
+    moba::common::Atomic<AuxState> auxPinState_[]                = {AUX_OFF, AUX_OFF, AUX_OFF};
+    moba::common::Atomic<bool> auxPinTrigger_[]                  = {false, false, false};
+    moba::common::Atomic<bool> thunderStormState_                = false;
+    moba::common::Atomic<bool> thunderStormTrigger_              = false;
+    moba::common::Atomic<bool> selftestRunning_                  = false;
 
     enum ThreadIdentifier {
         TH_STATUS_BAR = 0,
@@ -139,7 +139,7 @@ namespace {
 
     pthread_t th[TH_LAST];
 
-    moba::Atomic<bool> running = true;
+    moba::common::Atomic<bool> running = true;
 
     bool debouncedInputRead(int pin) {
         int j = 0;
@@ -446,7 +446,7 @@ namespace {
     }
 }
 
-Bridge::Bridge( boost::shared_ptr<moba::IPC> ipc) : ipc(ipc) {
+Bridge::Bridge( boost::shared_ptr<moba::common::IPC> ipc) : ipc(ipc) {
     srand(time(NULL));
     wiringPiSetup();
     pinMode(CURTAIN_DIR,       OUTPUT);
@@ -487,75 +487,75 @@ Bridge::~Bridge() {
 }
 
 void Bridge::selftesting() {
-    LOG(moba::INFO) << "selftesting" << std::endl;
-    ipc->send("", moba::IPC::CMD_TEST);
+    LOG(moba::common::LogLevel::INFO) << "selftesting" << std::endl;
+    ipc->send("", moba::common::IPC::CMD_TEST);
     selftestRunning_ = true;
 }
 
 void Bridge::shutdown() {
-    LOG(moba::INFO) << "shutdown" << std::endl;
+    LOG(moba::common::LogLevel::INFO) << "shutdown" << std::endl;
     execl("/usr/local/bin/moba-shutdown", "moba-shutdown", "-p", "23", (char *)NULL);
 }
 
 void Bridge::reboot() {
-    LOG(moba::INFO) << "reboot" << std::endl;
+    LOG(moba::common::LogLevel::INFO) << "reboot" << std::endl;
     execl("/usr/local/bin/moba-shutdown", "moba-shutdown", "-r", (char *)NULL);
 }
 
 void Bridge::auxOn(AuxPin nb) {
-    LOG(moba::INFO) << "auxOn <" << nb << ">" << std::endl;
+    LOG(moba::common::LogLevel::INFO) << "auxOn <" << nb << ">" << std::endl;
     auxPinState_[nb] = AUX_ON;
 }
 
 void Bridge::auxOff(AuxPin nb) {
-    LOG(moba::INFO) << "auxOff <" << nb << ">" << std::endl;
+    LOG(moba::common::LogLevel::INFO) << "auxOff <" << nb << ">" << std::endl;
     auxPinState_[nb] = AUX_OFF;
 }
 
 void Bridge::auxTrigger(AuxPin nb) {
-    LOG(moba::INFO) << "auxTrigger <" << nb << ">" << std::endl;
+    LOG(moba::common::LogLevel::INFO) << "auxTrigger <" << nb << ">" << std::endl;
     auxPinTrigger_[nb] = true;
 }
 
 void Bridge::curtainUp() {
-    LOG(moba::INFO) << "curtainUp" << std::endl;
+    LOG(moba::common::LogLevel::INFO) << "curtainUp" << std::endl;
     curtainState_ = CURTAIN_UP;
 }
 
 void Bridge::curtainDown() {
-    LOG(moba::INFO) << "curtainDown" << std::endl;
+    LOG(moba::common::LogLevel::INFO) << "curtainDown" << std::endl;
     curtainState_ = CURTAIN_DOWN;
 }
 
 void Bridge::setStatusBar(Bridge::StatusBarState sbstate) {
-    LOG(moba::INFO) << "setStatusBar <" << getStatusbarClearText(sbstate) << ">" << std::endl;
+    LOG(moba::common::LogLevel::INFO) << "setStatusBar <" << getStatusbarClearText(sbstate) << ">" << std::endl;
     statusBarState_ = sbstate;
 }
 
 void Bridge::mainLightOn() {
-    LOG(moba::INFO) << "mainLightOn" << std::endl;
+    LOG(moba::common::LogLevel::INFO) << "mainLightOn" << std::endl;
     mainLightState_ = MAINLIGHT_ON;
 }
 
 void Bridge::mainLightOff() {
-    LOG(moba::INFO) << "mainLightOff" << std::endl;
+    LOG(moba::common::LogLevel::INFO) << "mainLightOff" << std::endl;
     mainLightState_ = MAINLIGHT_OFF;
 }
 
 void Bridge::thunderstormOn() {
-    LOG(moba::INFO) << "thunderstormOn" << std::endl;
-    // FIXME ipc->send("", moba::IPC::CMD_EMERGENCY_STOP);
+    LOG(moba::common::LogLevel::INFO) << "thunderstormOn" << std::endl;
+    // FIXME ipc->send("", moba::common::IPC::CMD_EMERGENCY_STOP);
     thunderStormState_ = true;
 }
 
 void Bridge::thunderstormOff() {
-    LOG(moba::INFO) << "thunderstormOff" << std::endl;
-    // FIXME ipc->send("", moba::IPC::CMD_EMERGENCY_STOP);
+    LOG(moba::common::LogLevel::INFO) << "thunderstormOff" << std::endl;
+    // FIXME ipc->send("", moba::common::IPC::CMD_EMERGENCY_STOP);
     thunderStormState_ = false;
 }
 
 void Bridge::thunderstormTrigger() {
-    LOG(moba::INFO) << "thunderstormTrigger" << std::endl;
+    LOG(moba::common::LogLevel::INFO) << "thunderstormTrigger" << std::endl;
     thunderStormTrigger_ = true;
 }
 
@@ -566,19 +566,19 @@ Bridge::SwitchState Bridge::checkSwitchState() {
 }
 
 void Bridge::setEmergencyStop() {
-    ipc->send("", moba::IPC::CMD_EMERGENCY_STOP);
+    ipc->send("", moba::common::IPC::CMD_EMERGENCY_STOP);
 }
 
 void Bridge::setEmergencyStopClearing() {
-    ipc->send("", moba::IPC::CMD_EMERGENCY_RELEASE);
+    ipc->send("", moba::common::IPC::CMD_EMERGENCY_RELEASE);
 }
 
 void Bridge::setAmbientLight(int blue, int green, int red, int white, int duration) {
-    LOG(moba::INFO) << "setAmbientLight <" << blue << "><" << green << "><" << red << "><" << white << "><" << duration << ">" << std::endl;
+    LOG(moba::common::LogLevel::INFO) << "setAmbientLight <" << blue << "><" << green << "><" << red << "><" << white << "><" << duration << ">" << std::endl;
     std::stringstream ss;
     ss << blue << ";" << green << ";" << red << ";" << white << ";" << duration;
-    LOG(moba::INFO) << "sending " << ss.str() << std::endl;
-    ipc->send(ss.str(), moba::IPC::CMD_RUN);
+    LOG(moba::common::LogLevel::INFO) << "sending " << ss.str() << std::endl;
+    ipc->send(ss.str(), moba::common::IPC::CMD_RUN);
 }
 
 std::string Bridge::getStatusbarClearText(Bridge::StatusBarState statusbar) {

@@ -21,7 +21,7 @@
 #include <boost/algorithm/string.hpp>
 
 #include "msgloop.h"
-#include <moba/ipc.h>
+#include <moba-common/ipc.h>
 
 MessageLoop::MessageLoop(
     const std::string &appName, const moba::Version &version,

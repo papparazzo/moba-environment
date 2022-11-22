@@ -18,6 +18,15 @@
  *
  */
 
+#include <config.h>
+
+#include <iostream>
+
+#include <moba-common/version.h>
+#include <moba-common/helper.h>
+#include <moba-common/ipc.h>
+
+/*
 #include "bridge.h"
 #include <cstdio>
 #include <cstdlib>
@@ -37,17 +46,18 @@
 #include <moba/helper.h>
 #include <moba/ipc.h>
 
-#include <config.h>
+
 
 #include "msgloop.h"
+*/
 
 namespace {
-    moba::AppData appData = {
+    moba::common::AppData appData = {
         PACKAGE_NAME,
-        moba::Version(PACKAGE_VERSION),
+        moba::common::Version{PACKAGE_VERSION},
         __DATE__,
         __TIME__,
-        "localhost",
+        "::1",
         7000
     };
 
@@ -55,7 +65,7 @@ namespace {
 }
 
 int main(int argc, char* argv[]) {
-    int key = moba::IPC::DEFAULT_KEY;
+    int key = moba::common::IPC::DEFAULT_KEY;
 
     switch(argc) {
         case 4:
@@ -70,14 +80,11 @@ int main(int argc, char* argv[]) {
         default:
             break;
     }
-    moba::printAppData(appData);
 
-    if(!moba::setCoreFileSizeToULimit()) {
-        LOG(moba::WARNING) << "Could not set corefile-size to unlimited" << std::endl;
-    }
+    moba::common::setCoreFileSizeToULimit();
 
     if(geteuid() != 0) {
-        LOG(moba::ERROR) << "This daemon can only be run by root user, exiting" << std::endl;
+        std::cout << "This daemon can only be run by root user, exiting" << std::endl;
 	    exit(EXIT_FAILURE);
 	}
 /*
@@ -93,6 +100,7 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 */
+    /*
     boost::shared_ptr<moba::IPC> ipc(new moba::IPC(key, moba::IPC::TYPE_CLIENT));
     boost::shared_ptr<Bridge> bridge(new Bridge(ipc));
     moba::MsgEndpointPtr endpoint(new moba::MsgEndpoint(appData.host, appData.port));
@@ -108,4 +116,5 @@ int main(int argc, char* argv[]) {
             sleep(4);
         }
     }
+     */
 }
