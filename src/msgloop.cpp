@@ -24,13 +24,13 @@
 #include <moba-common/ipc.h>
 
 MessageLoop::MessageLoop(
-    const std::string &appName, const moba::Version &version,
-    boost::shared_ptr<Bridge> bridge, moba::MsgEndpointPtr endpoint
-) : appName(appName), version(version), bridge(bridge), msgEndpoint(endpoint) {
+    BridgePtr bridge, EndpointPtr endpoint
+) : bridge{bridge}, endpoint{endpoint} {
     bridge->setStatusBar(Bridge::SBS_INIT);
 }
 
 void MessageLoop::run() {
+   /*
     while(true) {
         Bridge::SwitchState ss = bridge->checkSwitchState();
 
@@ -134,8 +134,9 @@ void MessageLoop::run() {
                 break;
         }
     }
+    * */
 }
-
+/*
 void MessageLoop::connect() {
     moba::JsonArrayPtr groups(new moba::JsonArray());
     groups->push_back(moba::toJsonStringPtr("BASE"));
@@ -331,3 +332,4 @@ void MessageLoop::setHardwareState(const std::string &s) {
     }
     bridge->setStatusBar(statusbarState);
 }
+ * */

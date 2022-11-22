@@ -21,13 +21,19 @@
 #include <config.h>
 
 #include <iostream>
+#include <memory>
 
 #include <moba-common/version.h>
 #include <moba-common/helper.h>
 #include <moba-common/ipc.h>
 
-/*
 #include "bridge.h"
+#include "msgloop.h"
+#include "moba/endpoint.h"
+#include "moba/socket.h"
+
+
+/*
 #include <cstdio>
 #include <cstdlib>
 #include <libgen.h>
@@ -41,14 +47,6 @@
 #include <sys/resource.h>
 #include <stdlib.h>
 
-#include <moba/log.h>
-#include <moba/version.h>
-#include <moba/helper.h>
-#include <moba/ipc.h>
-
-
-
-#include "msgloop.h"
 */
 
 namespace {
@@ -91,19 +89,22 @@ int main(int argc, char* argv[]) {
     int fh = open(pidfile, O_RDWR | O_CREAT, 0644);
 
     if(fh == -1) {
-        LOG(tlog::Error) << "Could not open PID lock file <" << pidfile << ">, exiting" << std::endl;
+        std::cout << "Could not open PID lock file <" << pidfile << ">, exiting" << std::endl;
         exit(EXIT_FAILURE);
     }
 
     if(lockf(fh, F_TLOCK, 0) == -1) {
-        LOG(tlog::Error) << "Could not lock PID lock file <" << pidfile << ">, exiting" << std::endl;
+        std::cout << "Could not lock PID lock file <" << pidfile << ">, exiting" << std::endl;
         exit(EXIT_FAILURE);
     }
 */
+
+    auto ipc = std::make_shared<moba::common::IPC>(key, moba::common::IPC::TYPE_CLIENT);
+    auto socket = std::make_shared<Socket>(appData.host, appData.port);
+    auto endpoint = EndpointPtr{new Endpoint{socket, appData.appName, appData.version, {Message::SERVER, Message::SYSTEM, Message::GUI, Message::TIMER}}};
+    auto bridge = std::make_shared<Bridge>(ipc);
+
     /*
-    boost::shared_ptr<moba::IPC> ipc(new moba::IPC(key, moba::IPC::TYPE_CLIENT));
-    boost::shared_ptr<Bridge> bridge(new Bridge(ipc));
-    moba::MsgEndpointPtr endpoint(new moba::MsgEndpoint(appData.host, appData.port));
 
     while(true) {
         try {

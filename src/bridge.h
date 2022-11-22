@@ -20,12 +20,10 @@
 
 #pragma once
 
-#include <boost/shared_ptr.hpp>
-#include <boost/noncopyable.hpp>
-
+#include <memory>
 #include <moba-common/ipc.h>
 
-class Bridge : private boost::noncopyable {
+class Bridge {
     public:
         enum StatusBarState {
             SBS_ERROR          = 0,   // rot blitz
@@ -50,8 +48,11 @@ class Bridge : private boost::noncopyable {
             SS_LONG_ONCE
         };
 
-        Bridge(boost::shared_ptr<moba::common::IPC> ipc);
+        Bridge(std::shared_ptr<moba::common::IPC> ipc);
         virtual ~Bridge();
+
+        Bridge(const Bridge&) = delete;
+        Bridge& operator=(const Bridge&) = delete;
 
         void curtainUp();
         void curtainDown();
@@ -80,6 +81,8 @@ class Bridge : private boost::noncopyable {
         SwitchState checkSwitchState();
 
     protected:
-        boost::shared_ptr<moba::common::IPC> ipc;
+        std::shared_ptr<moba::common::IPC> ipc;
         std::string getStatusbarClearText(StatusBarState statusbar);
 };
+
+using BridgePtr = std::shared_ptr<Bridge>;

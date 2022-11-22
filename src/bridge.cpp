@@ -19,6 +19,8 @@
  */
 
 #include <wiringPi.h>
+#include <atomic>
+
 #include <unistd.h>
 #include <cstdlib>
 #include <ctime>
@@ -27,7 +29,6 @@
 #include <pthread.h>
 
 #include <moba-common/log.h>
-#include <moba-common/atomic.h>
 
 #include "bridge.h"
 
@@ -116,15 +117,15 @@ namespace {
         "thunder4.mp3",
     };
 
-    moba::common::Atomic<Bridge::StatusBarState> statusBarState_ = Bridge::SBS_INIT;
-    moba::common::Atomic<Bridge::SwitchState> switchState_       = Bridge::SS_UNSET;
-    moba::common::Atomic<CurtainState> curtainState_             = CURTAIN_STOP;
-    moba::common::Atomic<MainLightState> mainLightState_         = MAINLIGHT_IDLE;
-    moba::common::Atomic<AuxState> auxPinState_[]                = {AUX_OFF, AUX_OFF, AUX_OFF};
-    moba::common::Atomic<bool> auxPinTrigger_[]                  = {false, false, false};
-    moba::common::Atomic<bool> thunderStormState_                = false;
-    moba::common::Atomic<bool> thunderStormTrigger_              = false;
-    moba::common::Atomic<bool> selftestRunning_                  = false;
+    std::atomic<Bridge::StatusBarState> statusBarState_ = Bridge::SBS_INIT;
+    std::atomic<Bridge::SwitchState> switchState_       = Bridge::SS_UNSET;
+    std::atomic<CurtainState> curtainState_             = CURTAIN_STOP;
+    std::atomic<MainLightState> mainLightState_         = MAINLIGHT_IDLE;
+    std::atomic<AuxState> auxPinState_[]                = {AUX_OFF, AUX_OFF, AUX_OFF};
+    std::atomic<bool> auxPinTrigger_[]                  = {false, false, false};
+    std::atomic<bool> thunderStormState_                = false;
+    std::atomic<bool> thunderStormTrigger_              = false;
+    std::atomic<bool> selftestRunning_                  = false;
 
     enum ThreadIdentifier {
         TH_STATUS_BAR = 0,
@@ -139,7 +140,7 @@ namespace {
 
     pthread_t th[TH_LAST];
 
-    moba::common::Atomic<bool> running = true;
+    std::atomic<bool> running = true;
 
     bool debouncedInputRead(int pin) {
         int j = 0;
@@ -446,7 +447,7 @@ namespace {
     }
 }
 
-Bridge::Bridge( boost::shared_ptr<moba::common::IPC> ipc) : ipc(ipc) {
+Bridge::Bridge(std::shared_ptr<moba::common::IPC> ipc) : ipc{ipc} {
     srand(time(NULL));
     wiringPiSetup();
     pinMode(CURTAIN_DIR,       OUTPUT);

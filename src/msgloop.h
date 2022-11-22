@@ -20,23 +20,20 @@
 
 #pragma once
 
-#include <string>
-#include <boost/shared_ptr.hpp>
-#include <boost/noncopyable.hpp>
-
+#include "moba/endpoint.h"
 #include "bridge.h"
 
-#include <moba/msgendpoint.h>
-#include <moba/log.h>
+#include <string>
 
 class MessageLoop : private boost::noncopyable {
     public:
         MessageLoop(
-            const std::string &appName,
-            const moba::Version &version,
-            boost::shared_ptr<Bridge> bridge,
-            moba::MsgEndpointPtr
+            BridgePtr bridge,
+            EndpointPtr endpoint
         );
+
+        MessageLoop(const MessageLoop&) = delete;
+        MessageLoop& operator=(const MessageLoop&) = delete;
 
         void run();
         void connect();
@@ -48,7 +45,7 @@ class MessageLoop : private boost::noncopyable {
             int blue;
             int white;
         };
-
+/*
         void printError(moba::JsonItemPtr ptr);
         void checkSwitchState();
         void setAutoMode(bool on);
@@ -58,14 +55,12 @@ class MessageLoop : private boost::noncopyable {
         void setAmbience(moba::JsonItemPtr ptr);
         void setAmbientLight(moba::JsonItemPtr ptr);
         void setAmbientLight();
-
+*/
         bool automatic;
 
-        moba::MsgEndpointPtr msgEndpoint;
-        long appId;
-        std::string appName;
-        moba::Version version;
-        boost::shared_ptr<Bridge> bridge;
+        EndpointPtr endpoint;
+
+        BridgePtr bridge;
 
         Bridge::StatusBarState statusbarState;
         AmbientLightData ambientLightData;

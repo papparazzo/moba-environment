@@ -59,10 +59,10 @@ Makefile
 *.out
 *.app
 core
+moba-environment
 
 /libtool
 /config.status
-/moba-environment
 /configure.scan
 /autoscan.log
 /response.log
