@@ -1,0 +1,3 @@
+[submodule "modules/lib-msghandling"]
+	path = modules/lib-msghandling
+	url = git@github.com:papparazzo/moba-lib-msghandling.git
