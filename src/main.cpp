@@ -59,7 +59,7 @@ namespace {
         7000
     };
 
-    std::string pidfile = "/var/run/environment.pid";
+    std::string pidfile = "/run/environment.pid";
 }
 
 int main(int argc, char* argv[]) {
@@ -79,12 +79,10 @@ int main(int argc, char* argv[]) {
             break;
     }
 
-    moba::common::setCoreFileSizeToULimit();
-
     if(geteuid() != 0) {
-        std::cout << "This daemon can only be run by root user, exiting" << std::endl;
-	    exit(EXIT_FAILURE);
-	}
+        std::cerr << "This daemon can only be run by root user, exiting" << std::endl;
+        exit(EXIT_FAILURE);
+    }
 /*
     int fh = open(pidfile, O_RDWR | O_CREAT, 0644);
 
@@ -99,23 +97,17 @@ int main(int argc, char* argv[]) {
     }
 */
 
-    auto ipc = std::make_shared<moba::common::IPC>(key, moba::common::IPC::TYPE_CLIENT);
+    //auto ipc = std::make_shared<moba::common::IPC>(key, moba::common::IPC::TYPE_CLIENT);
+    auto bridge = std::make_shared<Bridge>(/*ipc*/);
     auto socket = std::make_shared<Socket>(appData.host, appData.port);
-    auto endpoint = EndpointPtr{new Endpoint{socket, appData.appName, appData.version, {Message::SERVER, Message::SYSTEM, Message::GUI, Message::TIMER}}};
-    auto bridge = std::make_shared<Bridge>(ipc);
+    auto endpoint = EndpointPtr{new Endpoint{
+        socket,
+        appData.appName,
+        appData.version,
+        {Message::SYSTEM, Message::TIMER, Message::ENVIRONMENT}
+    }};
 
-    /*
-
-    while(true) {
-        try {
-            MessageLoop loop(appData.appName, appData.version, bridge, endpoint);
-            loop.connect();
-            loop.run();
-            exit(EXIT_SUCCESS);
-        } catch(std::exception &e) {
-            LOG(moba::WARNING) << e.what() << std::endl;
-            sleep(4);
-        }
-    }
-     */
+    MessageLoop loop{bridge, endpoint};
+    loop.run();
+    exit(EXIT_SUCCESS);
 }

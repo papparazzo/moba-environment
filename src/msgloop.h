@@ -21,22 +21,18 @@
 #pragma once
 
 #include "moba/endpoint.h"
+#include "moba/systemmessages.h"
+#include "moba/clientmessages.h"
 #include "bridge.h"
-
-#include <string>
 
 class MessageLoop : private boost::noncopyable {
     public:
-        MessageLoop(
-            BridgePtr bridge,
-            EndpointPtr endpoint
-        );
+        MessageLoop(BridgePtr bridge, EndpointPtr endpoint);
 
         MessageLoop(const MessageLoop&) = delete;
         MessageLoop& operator=(const MessageLoop&) = delete;
 
         void run();
-        void connect();
 
     protected:
         struct AmbientLightData {
@@ -45,22 +41,27 @@ class MessageLoop : private boost::noncopyable {
             int blue;
             int white;
         };
+
+        void checkSwitchState();
+        void setHardwareState(const SystemHardwareStateChanged &data);
+        void setError(const ClientError &data);
+
 /*
         void printError(moba::JsonItemPtr ptr);
         void checkSwitchState();
-        void setAutoMode(bool on);
         void setEnvironment(moba::JsonItemPtr ptr);
         void globalTimerEvent(moba::JsonItemPtr ptr);
-        void setHardwareState(const std::string &s);
         void setAmbience(moba::JsonItemPtr ptr);
         void setAmbientLight(moba::JsonItemPtr ptr);
-        void setAmbientLight();
 */
-        bool automatic;
+        void setAmbientLight();
 
-        EndpointPtr endpoint;
+        bool automatic;
+        bool standby;
+        bool closing;
 
         BridgePtr bridge;
+        EndpointPtr endpoint;
 
         Bridge::StatusBarState statusbarState;
         AmbientLightData ambientLightData;

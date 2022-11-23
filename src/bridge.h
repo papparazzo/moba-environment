@@ -24,65 +24,66 @@
 #include <moba-common/ipc.h>
 
 class Bridge {
-    public:
-        enum StatusBarState {
-            SBS_ERROR          = 0,   // rot blitz
-            SBS_INIT           = 1,   // rot
-            SBS_POWER_OFF      = 2,   // rot blink
+public:
+    enum class StatusBarState {
+        ERROR          = 0,   // rot blitz
+        INIT           = 1,   // rot
+        EMERGENCY_STOP = 2,   // rot blink
 
-            SBS_STANDBY        = 3,   // gruen blitz
-            SBS_READY          = 4,   // gruen
-            SBS_AUTOMATIC      = 5    // gruen blink
-        };
+        STANDBY        = 3,   // gruen blitz
+        READY          = 4,   // gruen
+        AUTOMATIC      = 5    // gruen blink
+    };
 
-        enum AuxPin {
-            AUX1,
-            AUX2,
-            AUX3
-        };
+    enum AuxPin {
+        AUX1,
+        AUX2,
+        AUX3
+    };
 
-        enum SwitchState {
-            SS_UNSET,
-            SS_SHORT_ONCE,
-            SS_SHORT_TWICE,
-            SS_LONG_ONCE
-        };
+    enum class SwitchState {
+        UNSET,
+        SHORT_ONCE,
+        SHORT_TWICE,
+        LONG_ONCE
+    };
 
-        Bridge(std::shared_ptr<moba::common::IPC> ipc);
-        virtual ~Bridge();
+    Bridge(/*std::shared_ptr<moba::common::IPC> ipc*/);
+    virtual ~Bridge();
 
-        Bridge(const Bridge&) = delete;
-        Bridge& operator=(const Bridge&) = delete;
+    Bridge(const Bridge&) = delete;
+    Bridge& operator=(const Bridge&) = delete;
 
-        void curtainUp();
-        void curtainDown();
-        void mainLightOn();
-        void mainLightOff();
+    void curtainUp();
+    void curtainDown();
+    void mainLightOn();
+    void mainLightOff();
 
-        void shutdown();
-        void reboot();
+    void shutdown();
+    void reboot();
 
-        void auxOn(AuxPin nb);
-        void auxOff(AuxPin nb);
-        void auxTrigger(AuxPin nb);
+    void auxOn(AuxPin nb);
+    void auxOff(AuxPin nb);
+    void auxTrigger(AuxPin nb);
 
-        void thunderstormOn();
-        void thunderstormOff();
-        void thunderstormTrigger();
+    void thunderstormOn();
+    void thunderstormOff();
+    void thunderstormTrigger();
 
-        void setStatusBar(StatusBarState sbstate);
+    void setStatusBar(StatusBarState sbstate);
 
-        void selftesting();
-        void setAmbientLight(int blue, int green, int red, int white, int ratio);
+    void selftesting();
+    void setAmbientLight(int blue, int green, int red, int white, int ratio);
 
-        void setEmergencyStop();
-        void setEmergencyStopClearing();
+    void setEmergencyStop();
+    void setEmergencyStopClearing();
 
-        SwitchState checkSwitchState();
+    SwitchState checkSwitchState();
 
-    protected:
-        std::shared_ptr<moba::common::IPC> ipc;
-        std::string getStatusbarClearText(StatusBarState statusbar);
+protected:
+    std::shared_ptr<moba::common::IPC> ipc;
+    std::string getStatusbarClearText(StatusBarState statusbar);
+
 };
 
 using BridgePtr = std::shared_ptr<Bridge>;
