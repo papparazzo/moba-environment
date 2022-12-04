@@ -3,10 +3,11 @@ bin_PROGRAMS = \
     moba-environment
 
 moba_environment_SOURCES = \
-    main.cpp \
     bridge.cpp \
+    eclipsecontrol.cpp \
+    main.cpp \
     msgloop.cpp \
-    eclipsecontrol.cpp
+    statuscontrol.cpp
 
 moba_environment_LDADD = \
     $(GLIB_LIBS) \
