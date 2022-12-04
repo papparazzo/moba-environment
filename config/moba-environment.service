@@ -1,0 +1,11 @@
+[Unit]
+Description=moba environment daemon
+
+[Service]
+Type=simple
+ExecStart=moba-environment
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-abort
+
+[Install]
+WantedBy=default.target
