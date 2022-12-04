@@ -1,7 +1,7 @@
 /*
  *  Project:    moba-environment
  *
- *  Copyright (C) 2016 Stefan Paproth <pappi-@gmx.de>
+ *  Copyright (C) 2022 Stefan Paproth <pappi-@gmx.de>
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU Affero General Public License as
@@ -18,19 +18,9 @@
  *
  */
 
-#include <wiringPi.h>
-#include <atomic>
-
-#include <unistd.h>
-#include <cstdlib>
-#include <ctime>
-#include <string>
-#include <sstream>
-#include <pthread.h>
-
-#include <moba-common/log.h>
-
 #include "bridge.h"
+#include <thread>
+#include <wiringPi.h>
 
 /*
  +-----+-----+---------+------+---+---Pi 2---+---+------+---------+-----+-----+
@@ -61,556 +51,47 @@
  +-----+-----+---------+------+---+---Pi 2---+---+------+---------+-----+-----+
  */
 
-namespace {
-
-    enum PinInputMapping {
-        LIGHT_STATE       = 29,  // PIN 40
-        PUSH_BUTTON_STATE = 28,  // PIN 38
-    };
-
-    enum PinOutputMapping {
-        STATUS_GREEN = 24,       // PIN 35
-        STATUS_RED   = 27,       // PIN 36
-
-        SHUTDOWN     = 23,       // PIN 33
-        MAIN_LIGHT   = 26,       // PIN 32
-
-        CURTAIN_DIR  = 22,       // PIN 31
-        CURTAIN_ON   = 21,       // PIN 29
-
-        AUX_1        = 5,        // PIN 18
-        AUX_2        = 4,        // PIN 16
-        AUX_3        = 3,        // PIN 15
-
-        FLASH_1      = 2,        // PIN 13
-        FLASH_2      = 1,        // PIN 12
-        FLASH_3      = 0,        // PIN 11
-    };
-
-    enum CurtainState {
-        CURTAIN_UP   = 0,
-        CURTAIN_DOWN = 1,
-        CURTAIN_STOP = 2,
-    };
-
-    enum MainLightState {
-        MAINLIGHT_ON   = 0,
-        MAINLIGHT_OFF  = 1,
-        MAINLIGHT_IDLE = 2,
-    };
-
-    enum AuxState {
-        AUX_ON       = 0,
-        AUX_OFF      = 1,
-        AUX_ON_IDLE  = 2,
-        AUX_OFF_IDLE = 3,
-    };
-
-    PinOutputMapping auxPins[] = {
-        AUX_1,
-        AUX_2,
-        AUX_3
-    };
-
-    PinOutputMapping flashPins[] = {
-        FLASH_1,
-        FLASH_2,
-        FLASH_3
-    };
-
-    const char *thunder[] = {
-        "thunder0.mp3",
-        "thunder1.mp3",
-        "thunder2.mp3",
-        "thunder3.mp3",
-        "thunder4.mp3",
-    };
-
-    std::atomic<Bridge::StatusBarState> statusBarState_ = Bridge::StatusBarState::INIT;
-    std::atomic<Bridge::SwitchState> switchState_       = Bridge::SwitchState::UNSET;
-    std::atomic<CurtainState> curtainState_             = CURTAIN_STOP;
-    std::atomic<MainLightState> mainLightState_         = MAINLIGHT_IDLE;
-    std::atomic<AuxState> auxPinState_[]                = {AUX_OFF, AUX_OFF, AUX_OFF};
-    std::atomic<bool> auxPinTrigger_[]                  = {false, false, false};
-    std::atomic<bool> thunderStormState_                = false;
-    std::atomic<bool> thunderStormTrigger_              = false;
-    std::atomic<bool> selftestRunning_                  = false;
-
-    enum ThreadIdentifier {
-        TH_STATUS_BAR = 0,
-        TH_CURTAIN,
-        TH_MAINLIGHT,
-        TH_THUNDERSTORM,
-        TH_AUX,
-        TH_SWITCH_STATE,
-        TH_SELF_TESTING,
-        TH_LAST
-    };
-
-    pthread_t th[TH_LAST];
-
-    std::atomic<bool> running = true;
-
-    bool debouncedInputRead(int pin) {
-        int j = 0;
-        for(int i = 0; i < 6; ++i) {
-            if(digitalRead(pin)) {
-                ++j;
-            }
-            delayMicroseconds(25);
-        }
-        return j > 3;
-    }
-
-    void *statusBar_(void *) {
-        while(running) {
-            if(selftestRunning_) {
-                delay(500);
-                continue;
-            }
-
-            Bridge::StatusBarState sbs = statusBarState_;
-
-            switch(sbs) {
-                case Bridge::StatusBarState::ERROR:
-                case Bridge::StatusBarState::INIT:
-                case Bridge::StatusBarState::EMERGENCY_STOP:
-                    digitalWrite(STATUS_RED, HIGH);
-                    digitalWrite(STATUS_GREEN, LOW);
-                    break;
-
-                case Bridge::StatusBarState::STANDBY:
-                case Bridge::StatusBarState::READY:
-                case Bridge::StatusBarState::AUTOMATIC:
-                    digitalWrite(STATUS_GREEN, HIGH);
-                    digitalWrite(STATUS_RED, LOW);
-                    break;
-            }
-            delay(25);
-            switch(sbs) {
-                case Bridge::StatusBarState::ERROR:
-                    digitalWrite(STATUS_RED, LOW);
-                    break;
-
-                case Bridge::StatusBarState::STANDBY:
-                    digitalWrite(STATUS_GREEN, LOW);
-                    break;
-
-                default:
-                    break;
-            }
-            delay(700);
-            switch(sbs) {
-                case Bridge::StatusBarState::EMERGENCY_STOP:
-                    digitalWrite(STATUS_RED, LOW);
-                    break;
-
-                case Bridge::StatusBarState::AUTOMATIC:
-                    digitalWrite(STATUS_GREEN, LOW);
-                    break;
-
-                default:
-                    break;
-            }
-            delay(750);
-        }
-        digitalWrite(STATUS_RED, LOW);
-        digitalWrite(STATUS_GREEN, LOW);
-        return NULL;
-    }
-
-    void *curtain_(void *) {
-        CurtainState currentCurtainState = CURTAIN_STOP;
-
-        while(running) {
-            if(selftestRunning_) {
-                delay(500);
-                continue;
-            }
-
-            sleep(1);
-            if(curtainState_ == CURTAIN_STOP) {
-                continue;
-            }
-
-            if(currentCurtainState == curtainState_) {
-                continue;
-            }
-            currentCurtainState = curtainState_;
-
-            int dir = HIGH;
-            if(currentCurtainState == CURTAIN_UP) {
-                dir = LOW;
-            }
-            digitalWrite(CURTAIN_ON, HIGH);
-            digitalWrite(CURTAIN_DIR, dir);
-
-            for(int i = 0; i < 30; ++i) {
-                if(currentCurtainState != curtainState_) {
-                    break;
-                }
-                sleep(1);
-            }
-            digitalWrite(CURTAIN_ON, LOW);
-            digitalWrite(CURTAIN_DIR, LOW);
-        }
-        return NULL;
-    }
-
-    void *mainLight_(void *) {
-        while(running) {
-            if(selftestRunning_) {
-                delay(500);
-                continue;
-            }
-
-            sleep(1);
-            MainLightState mal = mainLightState_;
-
-            if(mal == MAINLIGHT_IDLE) {
-                continue;
-            }
-            if(!debouncedInputRead(LIGHT_STATE) && mal == MAINLIGHT_ON) {
-                continue;
-            }
-            if(debouncedInputRead(LIGHT_STATE) && mal == MAINLIGHT_OFF) {
-                continue;
-            }
-            digitalWrite(MAIN_LIGHT, HIGH);
-            delay(500);
-            digitalWrite(MAIN_LIGHT, LOW);
-            mainLightState_ = MAINLIGHT_IDLE;
-        }
-        return NULL;
-    }
-
-    void *thunderStorm_(void *) {
-        while(running) {
-            if(selftestRunning_) {
-                delay(500);
-                continue;
-            }
-            if(!thunderStormState_ && !thunderStormTrigger_) {
-                sleep(1);
-                continue;
-            }
-            thunderStormTrigger_ = false;
-
-            int f = flashPins[rand() % 3];
-            digitalWrite(f, HIGH);
-            delay(500);
-            digitalWrite(f, LOW);
-            delay(rand() % 800 + 200);
-            // FIXME no hard-coded path
-            system(std::string(std::string("mpg123 ../../cpp/Environment/data/") + thunder[rand() % 5]).c_str());
-            sleep(rand() % 25);
-        }
-        return NULL;
-    }
-
-    void *aux_(void *) {
-        while(running) {
-            if(selftestRunning_) {
-                delay(500);
-                continue;
-            }
-            sleep(1);
-            for(int i = 0; i < 3; ++i) {
-                AuxState tmpAuxPinState = auxPinState_[i];
-                if(!running) {
-                    tmpAuxPinState = AuxState::AUX_OFF;
-                }
-                bool tmpAuxPinTrigger = auxPinTrigger_[i];
-
-                switch(tmpAuxPinState) {
-                    case AuxState::AUX_ON_IDLE:
-                        break;
-
-                    case AuxState::AUX_OFF_IDLE:
-                        if(tmpAuxPinTrigger) {
-                            digitalWrite(auxPins[i], HIGH);
-                            delay(500);
-                            digitalWrite(auxPins[i], LOW);
-                            auxPinTrigger_[i] = false;
-                        }
-                        break;
-
-                    case AuxState::AUX_OFF:
-                        digitalWrite(auxPins[i], LOW);
-                        auxPinState_[i] = AuxState::AUX_OFF_IDLE;
-                        break;
-
-                    case AuxState::AUX_ON:
-                        digitalWrite(auxPins[i], HIGH);
-                        auxPinState_[i] = AuxState::AUX_ON_IDLE;
-                        break;
-                }
-            }
-        }
-    }
-
-    void *switchStateChecker_(void *) {
-        while(running) {
-            if(switchState_ != Bridge::SwitchState::UNSET) {
-                sleep(1);
-                continue;
-            }
-
-            int cntOn = 0;
-            int cntOff = 0;
-            while(!debouncedInputRead(PUSH_BUTTON_STATE)) {
-                cntOn++;
-                if(cntOn > 2000) {
-                    break;
-                }
-                usleep(1000);
-            }
-
-            if(!cntOn) {
-                continue;
-            }
-
-            if(cntOn > 2000) {
-                switchState_ = Bridge::SwitchState::LONG_ONCE;
-                continue;
-            }
-
-            while(debouncedInputRead(PUSH_BUTTON_STATE)) {
-                cntOff++;
-                if(cntOff > 500) {
-                    break;
-                }
-                usleep(1000);
-            }
-
-            if(cntOff > 500) {
-                switchState_ = Bridge::SwitchState::SHORT_ONCE;
-                continue;
-            }
-            switchState_ = Bridge::SwitchState::SHORT_TWICE;
-        }
-    }
-
-    void *selftesting_(void *) {
-        while(running) {
-            if(!selftestRunning_) {
-                delay(500);
-                continue;
-            }
-            sleep(1);
-            digitalWrite(STATUS_RED,   HIGH);
-            digitalWrite(STATUS_GREEN, HIGH);
-
-            for(int i = 0; i < 3; ++i) {
-                digitalWrite(FLASH_1, HIGH);
-                digitalWrite(AUX_1,   HIGH);
-                delay(500);
-                digitalWrite(FLASH_1, LOW);
-                digitalWrite(AUX_1,   LOW);
-                delay(500);
-            }
-            sleep(3);
-            for(int i = 0; i < 3; ++i) {
-                digitalWrite(FLASH_2, HIGH);
-                digitalWrite(AUX_2,   HIGH);
-                delay(500);
-                digitalWrite(FLASH_2, LOW);
-                digitalWrite(AUX_2,   LOW);
-                delay(500);
-            }
-            sleep(3);
-            for(int i = 0; i < 3; ++i) {
-                digitalWrite(FLASH_3, HIGH);
-                digitalWrite(AUX_3,   HIGH);
-                delay(500);
-                digitalWrite(FLASH_3, LOW);
-                digitalWrite(AUX_3,   LOW);
-                delay(500);
-            }
-            sleep(3);
-
-            digitalWrite(MAIN_LIGHT,   HIGH);
-            delay(500);
-            digitalWrite(MAIN_LIGHT,   LOW);
-            delay(1500);
-            digitalWrite(MAIN_LIGHT,   HIGH);
-            delay(500);
-            digitalWrite(MAIN_LIGHT,   LOW);
-
-            for(int i = 0; i < 2; ++i) {
-                if(i) {
-                    digitalWrite(CURTAIN_DIR, HIGH);
-                } else {
-                    digitalWrite(CURTAIN_DIR, LOW);
-                }
-                digitalWrite(CURTAIN_ON, HIGH);
-                sleep(3);
-                digitalWrite(CURTAIN_ON, LOW);
-                digitalWrite(CURTAIN_DIR, LOW);
-
-            }
-            digitalWrite(STATUS_RED,   LOW);
-            digitalWrite(STATUS_GREEN, LOW);
-            selftestRunning_ = false;
-        }
-    }
-}
-
-Bridge::Bridge(/*std::shared_ptr<moba::common::IPC> ipc*/) /*: ipc{ipc}*/ {
-    /*
-    srand(time(NULL));
+Bridge::Bridge() {
     wiringPiSetup();
-    pinMode(CURTAIN_DIR,       OUTPUT);
-    pinMode(CURTAIN_ON,        OUTPUT);
-    pinMode(MAIN_LIGHT,        OUTPUT);
-    pinMode(SHUTDOWN,          OUTPUT);
-    pinMode(AUX_1,             OUTPUT);
-    pinMode(AUX_2,             OUTPUT);
-    pinMode(AUX_3,             OUTPUT);
-    pinMode(FLASH_1,           OUTPUT);
-    pinMode(FLASH_2,           OUTPUT);
-    pinMode(FLASH_3,           OUTPUT);
-    pinMode(STATUS_RED,        OUTPUT);
-    pinMode(STATUS_GREEN,      OUTPUT);
 
-    pinMode(LIGHT_STATE,       INPUT);
-    pinMode(PUSH_BUTTON_STATE, INPUT);
+    pinMode(Bridge::CURTAIN_DIR,       OUTPUT);
+    pinMode(Bridge::CURTAIN_ON,        OUTPUT);
+    pinMode(Bridge::MAIN_LIGHT,        OUTPUT);
+    pinMode(Bridge::SHUTDOWN,          OUTPUT);
+    pinMode(Bridge::AUX_1,             OUTPUT);
+    pinMode(Bridge::AUX_2,             OUTPUT);
+    pinMode(Bridge::AUX_3,             OUTPUT);
+    pinMode(Bridge::FLASH_1,           OUTPUT);
+    pinMode(Bridge::FLASH_2,           OUTPUT);
+    pinMode(Bridge::FLASH_3,           OUTPUT);
+    pinMode(Bridge::STATUS_RED,        OUTPUT);
+    pinMode(Bridge::STATUS_GREEN,      OUTPUT);
 
-    pthread_create(&th[TH_CURTAIN     ], NULL, curtain_,            NULL);
-    pthread_create(&th[TH_STATUS_BAR  ], NULL, statusBar_,          NULL);
-    pthread_create(&th[TH_MAINLIGHT   ], NULL, mainLight_,          NULL);
-    pthread_create(&th[TH_THUNDERSTORM], NULL, thunderStorm_,       NULL);
-    pthread_create(&th[TH_AUX         ], NULL, aux_,                NULL);
-    pthread_create(&th[TH_SWITCH_STATE], NULL, switchStateChecker_, NULL);
-    pthread_create(&th[TH_SELF_TESTING], NULL, selftesting_,        NULL);
-
-    for(int i = 0; i < TH_LAST; ++i) {
-        pthread_detach(th[i]);
-    }*/
+    pinMode(Bridge::LIGHT_STATE,       INPUT);
+    pinMode(Bridge::PUSH_BUTTON_STATE, INPUT);
 }
 
 Bridge::~Bridge() {
-/*
-    for(int i = 0; i < TH_LAST; ++i) {
-        pthread_cancel(th[i]);
+}
+
+void Bridge::setHight(PinOutputMapping pin) {
+    std::lock_guard<std::mutex> l{m};
+    digitalWrite(pin, HIGH);
+}
+
+void Bridge::setLow(PinOutputMapping pin) {
+    std::lock_guard<std::mutex> l{m};
+    digitalWrite(pin, LOW);
+}
+
+bool Bridge::getDebounced(PinInputMapping pin) {
+    std::lock_guard<std::mutex> l{m};
+    int j = 0;
+    for(int i = 0; i < 6; ++i) {
+        if(digitalRead(pin)) {
+            ++j;
+        }
+        std::this_thread::sleep_for(std::chrono::microseconds(25));
     }
- */
-}
-
-void Bridge::selftesting() {
-    LOG(moba::common::LogLevel::INFO) << "selftesting" << std::endl;
- //   ipc->send("", moba::common::IPC::CMD_TEST);
-    selftestRunning_ = true;
-}
-
-void Bridge::shutdown() {
-    LOG(moba::common::LogLevel::INFO) << "shutdown" << std::endl;
-    execl("/usr/local/bin/moba-shutdown", "moba-shutdown", "-p", "23", (char *)NULL);
-}
-
-void Bridge::reboot() {
-    LOG(moba::common::LogLevel::INFO) << "reboot" << std::endl;
-    execl("/usr/local/bin/moba-shutdown", "moba-shutdown", "-r", (char *)NULL);
-}
-
-void Bridge::auxOn(AuxPin nb) {
-    LOG(moba::common::LogLevel::INFO) << "auxOn <" << nb << ">" << std::endl;
-    auxPinState_[nb] = AUX_ON;
-}
-
-void Bridge::auxOff(AuxPin nb) {
-    LOG(moba::common::LogLevel::INFO) << "auxOff <" << nb << ">" << std::endl;
-    auxPinState_[nb] = AUX_OFF;
-}
-
-void Bridge::auxTrigger(AuxPin nb) {
-    LOG(moba::common::LogLevel::INFO) << "auxTrigger <" << nb << ">" << std::endl;
-    auxPinTrigger_[nb] = true;
-}
-
-void Bridge::curtainUp() {
-    LOG(moba::common::LogLevel::INFO) << "curtainUp" << std::endl;
-    curtainState_ = CURTAIN_UP;
-}
-
-void Bridge::curtainDown() {
-    LOG(moba::common::LogLevel::INFO) << "curtainDown" << std::endl;
-    curtainState_ = CURTAIN_DOWN;
-}
-
-void Bridge::setStatusBar(Bridge::StatusBarState sbstate) {
-    LOG(moba::common::LogLevel::INFO) << "setStatusBar <" << getStatusbarClearText(sbstate) << ">" << std::endl;
-    statusBarState_ = sbstate;
-}
-
-void Bridge::mainLightOn() {
-    LOG(moba::common::LogLevel::INFO) << "mainLightOn" << std::endl;
-    mainLightState_ = MAINLIGHT_ON;
-}
-
-void Bridge::mainLightOff() {
-    LOG(moba::common::LogLevel::INFO) << "mainLightOff" << std::endl;
-    mainLightState_ = MAINLIGHT_OFF;
-}
-
-void Bridge::thunderstormOn() {
-    LOG(moba::common::LogLevel::INFO) << "thunderstormOn" << std::endl;
-    // FIXME ipc->send("", moba::common::IPC::CMD_EMERGENCY_STOP);
-    thunderStormState_ = true;
-}
-
-void Bridge::thunderstormOff() {
-    LOG(moba::common::LogLevel::INFO) << "thunderstormOff" << std::endl;
-    // FIXME ipc->send("", moba::common::IPC::CMD_EMERGENCY_STOP);
-    thunderStormState_ = false;
-}
-
-void Bridge::thunderstormTrigger() {
-    LOG(moba::common::LogLevel::INFO) << "thunderstormTrigger" << std::endl;
-    thunderStormTrigger_ = true;
-}
-
-Bridge::SwitchState Bridge::checkSwitchState() {
-    Bridge::SwitchState tmp = switchState_;
-    switchState_ = Bridge::SwitchState::UNSET;
-    return tmp;
-}
-
-void Bridge::setEmergencyStop() {
-   // ipc->send("", moba::common::IPC::CMD_EMERGENCY_STOP);
-}
-
-void Bridge::setEmergencyStopClearing() {
-    // FIXME: Was machen wir hier?
-  //  ipc->send("", moba::common::IPC::CMD_EMERGENCY_RELEASE);
-}
-
-void Bridge::setAmbientLight(int blue, int green, int red, int white, int duration) {
-    LOG(moba::common::LogLevel::INFO) << "setAmbientLight <" << blue << "><" << green << "><" << red << "><" << white << "><" << duration << ">" << std::endl;
-    std::stringstream ss;
-    ss << blue << ";" << green << ";" << red << ";" << white << ";" << duration;
-    LOG(moba::common::LogLevel::INFO) << "sending " << ss.str() << std::endl;
-  //  ipc->send(ss.str(), moba::common::IPC::CMD_RUN);
-}
-
-std::string Bridge::getStatusbarClearText(Bridge::StatusBarState statusbar) {
-    switch(statusbar) {
-        case StatusBarState::ERROR:
-            return "ERROR";
-
-        case StatusBarState::INIT:
-            return "INIT";
-
-        case StatusBarState::EMERGENCY_STOP:
-            return "EMERGENCY_STOP";
-
-        case StatusBarState::STANDBY:
-            return "STANDBY";
-
-        case StatusBarState::READY:
-            return "READY";
-
-        case StatusBarState::AUTOMATIC:
-            return "AUTOMATIC";
-    }
+    return j > 3;
 }

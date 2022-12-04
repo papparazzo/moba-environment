@@ -1,7 +1,7 @@
 /*
  *  Project:    moba-environment
  *
- *  Copyright (C) 2016 Stefan Paproth <pappi-@gmx.de>
+ *  Copyright (C) 2022 Stefan Paproth <pappi-@gmx.de>
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU Affero General Public License as
@@ -21,69 +21,47 @@
 #pragma once
 
 #include <memory>
-#include <moba-common/ipc.h>
+#include <mutex>
 
 class Bridge {
 public:
-    enum class StatusBarState {
-        ERROR          = 0,   // rot blitz
-        INIT           = 1,   // rot
-        EMERGENCY_STOP = 2,   // rot blink
 
-        STANDBY        = 3,   // gruen blitz
-        READY          = 4,   // gruen
-        AUTOMATIC      = 5    // gruen blink
+    enum PinInputMapping {
+        LIGHT_STATE       = 29,  // PIN 40
+        PUSH_BUTTON_STATE = 28,  // PIN 38
     };
 
-    enum AuxPin {
-        AUX1,
-        AUX2,
-        AUX3
+    enum PinOutputMapping {
+        STATUS_GREEN = 24,       // PIN 35
+        STATUS_RED   = 27,       // PIN 36
+
+        SHUTDOWN     = 23,       // PIN 33
+        MAIN_LIGHT   = 26,       // PIN 32
+
+        CURTAIN_DIR  = 22,       // PIN 31
+        CURTAIN_ON   = 21,       // PIN 29
+
+        AUX_1        = 5,        // PIN 18
+        AUX_2        = 4,        // PIN 16
+        AUX_3        = 3,        // PIN 15
+
+        FLASH_1      = 2,        // PIN 13
+        FLASH_2      = 1,        // PIN 12
+        FLASH_3      = 0,        // PIN 11
     };
 
-    enum class SwitchState {
-        UNSET,
-        SHORT_ONCE,
-        SHORT_TWICE,
-        LONG_ONCE
-    };
-
-    Bridge(/*std::shared_ptr<moba::common::IPC> ipc*/);
+    Bridge();
     virtual ~Bridge();
 
     Bridge(const Bridge&) = delete;
     Bridge& operator=(const Bridge&) = delete;
 
-    void curtainUp();
-    void curtainDown();
-    void mainLightOn();
-    void mainLightOff();
+    void setHight(PinOutputMapping pin);
+    void setLow(PinOutputMapping pin);
+    bool getDebounced(PinInputMapping pin);
 
-    void shutdown();
-    void reboot();
-
-    void auxOn(AuxPin nb);
-    void auxOff(AuxPin nb);
-    void auxTrigger(AuxPin nb);
-
-    void thunderstormOn();
-    void thunderstormOff();
-    void thunderstormTrigger();
-
-    void setStatusBar(StatusBarState sbstate);
-
-    void selftesting();
-    void setAmbientLight(int blue, int green, int red, int white, int ratio);
-
-    void setEmergencyStop();
-    void setEmergencyStopClearing();
-
-    SwitchState checkSwitchState();
-
-protected:
-    std::shared_ptr<moba::common::IPC> ipc;
-    std::string getStatusbarClearText(StatusBarState statusbar);
-
+private:
+    std::mutex m;
 };
 
 using BridgePtr = std::shared_ptr<Bridge>;
