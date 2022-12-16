@@ -23,46 +23,53 @@
 #include "moba/endpoint.h"
 #include "moba/systemmessages.h"
 #include "moba/clientmessages.h"
-#include "bridge.h"
+#include "moba/environmentmessages.h"
+#include "statuscontrol.h"
+#include "eclipsecontrol.h"
 
-class MessageLoop : private boost::noncopyable {
-    public:
-        MessageLoop(BridgePtr bridge, EndpointPtr endpoint);
+class MessageLoop {
+public:
+    MessageLoop(EndpointPtr endpoint, StatusControlPtr status, EclipseControlPtr eclctr, BridgePtr bridge);
 
-        MessageLoop(const MessageLoop&) = delete;
-        MessageLoop& operator=(const MessageLoop&) = delete;
+    MessageLoop(const MessageLoop&) = delete;
+    MessageLoop& operator=(const MessageLoop&) = delete;
 
-        void run();
+    void run();
 
-    protected:
-        struct AmbientLightData {
-            int red;
-            int green;
-            int blue;
-            int white;
-        };
+protected:
+    struct AmbientLightData {
+        int red;
+        int green;
+        int blue;
+        int white;
+    };
 
-        void checkSwitchState();
-        void setHardwareState(const SystemHardwareStateChanged &data);
-        void setError(const ClientError &data);
+    void setHardwareState(const SystemHardwareStateChanged &data);
+    void setError(const ClientError &data);
+    void setAmbience(const EnvSetAmbience &data);
+
 
 /*
-        void printError(moba::JsonItemPtr ptr);
-        void checkSwitchState();
-        void setEnvironment(moba::JsonItemPtr ptr);
-        void globalTimerEvent(moba::JsonItemPtr ptr);
-        void setAmbience(moba::JsonItemPtr ptr);
-        void setAmbientLight(moba::JsonItemPtr ptr);
+    void printError(moba::JsonItemPtr ptr);
+    void checkSwitchState();
+    void setEnvironment(moba::JsonItemPtr ptr);
+    void globalTimerEvent(moba::JsonItemPtr ptr);
+    void setAmbientLight(moba::JsonItemPtr ptr);
 */
-        void setAmbientLight();
+    void setAmbientLight();
 
-        bool automatic;
-        bool standby;
-        bool closing;
+    void shutdown();
+    void reboot();
 
-        BridgePtr bridge;
-        EndpointPtr endpoint;
+    bool automatic{false};
+    bool emergency{false};
+    bool standby{false};
+    bool closing{false};
 
-        Bridge::StatusBarState statusbarState;
-        AmbientLightData ambientLightData;
+    EndpointPtr endpoint;
+    StatusControlPtr status;
+    EclipseControlPtr eclctr;
+    BridgePtr bridge;
+
+    AmbientLightData ambientLightData;
 };

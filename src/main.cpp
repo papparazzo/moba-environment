@@ -20,85 +20,43 @@
 
 #include <config.h>
 
-#include <iostream>
 #include <memory>
 
+#include <moba-common/daemon.h>
+#include <moba-common/ini.h>
 #include <moba-common/version.h>
 #include <moba-common/helper.h>
 #include <moba-common/ipc.h>
 
 #include "bridge.h"
+#include "eclipsecontrol.h"
+#include "statuscontrol.h"
 #include "msgloop.h"
 #include "moba/endpoint.h"
 #include "moba/socket.h"
 
-
-/*
-#include <cstdio>
-#include <cstdlib>
-#include <libgen.h>
-#include <unistd.h>
-#include <vector>
-#include <string>
-#include <iomanip>
-#include <errno.h>
-
-#include <sys/time.h>
-#include <sys/resource.h>
-#include <stdlib.h>
-
-*/
-
 namespace {
-    moba::common::AppData appData = {
+    moba::AppData appData = {
         PACKAGE_NAME,
-        moba::common::Version{PACKAGE_VERSION},
+        moba::Version{PACKAGE_VERSION},
         __DATE__,
         __TIME__,
         "::1",
         7000
     };
-
-    std::string pidfile = "/run/environment.pid";
 }
 
 int main(int argc, char* argv[]) {
-    int key = moba::common::IPC::DEFAULT_KEY;
+    moba::Daemon daemon{appData.appName};
 
-    switch(argc) {
-        case 4:
-            key = atoi(argv[3]);
+    daemon.daemonize();
 
-        case 3:
-            appData.port = atoi(argv[2]);
+    auto ini = std::make_shared<moba::Ini>(std::string{SYSCONFIR} + "/" + PACKAGE_NAME + ".conf");
 
-        case 2:
-            appData.host = std::string(argv[1]);
+    int key = ini->getInt("settings", "ipc_key", moba::IPC::DEFAULT_KEY);
+    appData.port = ini->getInt("settings", "port", appData.port);
+    appData.host = ini->getString("settings", "host", appData.host);
 
-        default:
-            break;
-    }
-
-    if(geteuid() != 0) {
-        std::cerr << "This daemon can only be run by root user, exiting" << std::endl;
-        exit(EXIT_FAILURE);
-    }
-/*
-    int fh = open(pidfile, O_RDWR | O_CREAT, 0644);
-
-    if(fh == -1) {
-        std::cout << "Could not open PID lock file <" << pidfile << ">, exiting" << std::endl;
-        exit(EXIT_FAILURE);
-    }
-
-    if(lockf(fh, F_TLOCK, 0) == -1) {
-        std::cout << "Could not lock PID lock file <" << pidfile << ">, exiting" << std::endl;
-        exit(EXIT_FAILURE);
-    }
-*/
-
-    //auto ipc = std::make_shared<moba::common::IPC>(key, moba::common::IPC::TYPE_CLIENT);
-    auto bridge = std::make_shared<Bridge>(/*ipc*/);
     auto socket = std::make_shared<Socket>(appData.host, appData.port);
     auto endpoint = EndpointPtr{new Endpoint{
         socket,
@@ -107,7 +65,16 @@ int main(int argc, char* argv[]) {
         {Message::SYSTEM, Message::TIMER, Message::ENVIRONMENT}
     }};
 
-    MessageLoop loop{bridge, endpoint};
+    auto bridge = std::make_shared<Bridge>();
+    auto status = std::make_shared<StatusControl>(bridge, endpoint);
+    auto eclctr = std::make_shared<EclipseControl>(bridge, ini);
+
+
+
+
+    //auto ipc = std::make_shared<moba::IPC>(key, moba::IPC::TYPE_CLIENT);
+
+    MessageLoop loop{endpoint, status, eclctr, bridge};
     loop.run();
     exit(EXIT_SUCCESS);
 }

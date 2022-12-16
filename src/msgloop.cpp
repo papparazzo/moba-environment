@@ -1,7 +1,7 @@
 /*
  *  Project:    moba-environment
  *
- *  Copyright (C) 2016 Stefan Paproth <pappi-@gmx.de>
+ *  Copyright (C) 2022 Stefan Paproth <pappi-@gmx.de>
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU Affero General Public License as
@@ -21,13 +21,14 @@
 #include "msgloop.h"
 #include "moba/registry.h"
 #include "moba/timermessages.h"
+#include "moba/environmentmessages.h"
 
 #include <moba-common/ipc.h>
 #include <thread>
+#include <syslog.h>
 
-MessageLoop::MessageLoop(BridgePtr bridge, EndpointPtr endpoint) :
-closing{false}, bridge{bridge}, endpoint{endpoint} {
-    bridge->setStatusBar(Bridge::StatusBarState::INIT);
+MessageLoop::MessageLoop(EndpointPtr endpoint, StatusControlPtr status, EclipseControlPtr eclctr, BridgePtr bridge) :
+endpoint{endpoint}, status{status}, eclctr{eclctr}, bridge{bridge} {
 }
 
 void MessageLoop::run() {
@@ -37,61 +38,29 @@ void MessageLoop::run() {
             endpoint->connect();
             Registry registry;
             registry.registerHandler<SystemHardwareStateChanged>(std::bind(&MessageLoop::setHardwareState, this, std::placeholders::_1));
-            registry.registerHandler<ClientShutdown>([this]{bridge->shutdown();});
-            registry.registerHandler<ClientReset>([this]{bridge->reboot();});
-            registry.registerHandler<ClientSelfTesting>([this]{bridge->selftesting();});
-/*
-            registry.registerHandler<InterfaceSetBrakeVector>(std::bind(&JsonReader::setBrakeVector, this, std::placeholders::_1));
-            registry.registerHandler<InterfaceSetLocoDirection>([this](const InterfaceSetLocoDirection &d){cs2writer->send(setLocDirection(d.localId, static_cast<std::uint8_t>(d.direction)));});
-            registry.registerHandler<InterfaceSetLocoSpeed>([this](const InterfaceSetLocoSpeed &d){cs2writer->send(setLocSpeed(d.localId, d.speed));});
-*/
+            registry.registerHandler<ClientShutdown>([this]{shutdown();});
+            registry.registerHandler<ClientReset>([this]{reboot();});
+            //registry.registerHandler<ClientSelfTesting>([this]{bridge->selftesting();});
+            registry.registerHandler<ClientError>(std::bind(&MessageLoop::setError, this, std::placeholders::_1));
+            registry.registerHandler<EnvSetAmbience>(std::bind(&MessageLoop::setAmbience, this, std::placeholders::_1));
+
             endpoint->sendMsg(SystemGetHardwareState{});
             endpoint->sendMsg(TimerGetGlobalTimer{});
-
+/*
+            if(bridge->getDebounced(Bridge::LIGHT_STATE)) {
+                endpoint->sendMsg(EnvSetAmbience{ToggleState::UNSET, ToggleState::ON});
+            } else {
+                endpoint->sendMsg(EnvSetAmbience{ToggleState::UNSET, ToggleState::OFF});
+            }
+*/
             while(!closing) {
-                checkSwitchState();
-
-                auto msg = endpoint->recieveMsg();
-                if(!msg) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds{50});
-                    continue;
-                }
-                registry.handleMsg(msg);
+                registry.handleMsg(endpoint->waitForNewMsg());
             }
         } catch(const std::exception &e) {
-            //LOG(moba::common::LogLevel::ERROR) << "exception occured! <" << e.what() << ">" << std::endl;
+            syslog(LOG_CRIT, "exception occured! <%s> started", e.what());
+            status->setStatusBar(StatusControl::StatusBarState::ERROR);
         }
         std::this_thread::sleep_for(std::chrono::milliseconds{500});
-    }
-}
-
-void MessageLoop::checkSwitchState() {
-    Bridge::SwitchState ss = bridge->checkSwitchState();
-
-    // Taster: 1x kurz -> Ruhemodus an / aus
-    //         2x kurz -> Automatik an / aus
-    //         1x lang -> Anlage aus
-
-    switch(ss) {
-        case Bridge::SwitchState::SHORT_ONCE:
-            std::cerr << "SHORT_ONCE" << std::endl;
-            // TODO: standby = !standby; ??
-            endpoint->sendMsg(SystemSetStandbyMode{standby});
-            break;
-
-        case Bridge::SwitchState::SHORT_TWICE:
-            std::cerr << "SHORT_TWICE" << std::endl;
-            // TODO: automatic = !automatic; ??
-            endpoint->sendMsg(SystemSetAutomaticMode{automatic});
-            break;
-
-        case Bridge::SwitchState::LONG_ONCE:
-            std::cerr << "LONG_ONCE" << std::endl;
-            endpoint->sendMsg(SystemHardwareShutdown{});
-            break;
-
-        case Bridge::SwitchState::UNSET:
-            break;
     }
 }
 
@@ -99,53 +68,89 @@ void MessageLoop::setHardwareState(const SystemHardwareStateChanged &data) {
 
     switch(data.hardwareState) {
         case SystemHardwareStateChanged::HardwareState::ERROR:
-            std::cerr << "setHardwareState <ERROR>" << std::endl;
-            statusbarState = Bridge::StatusBarState::ERROR;
+            syslog(LOG_INFO, "setHardwareState <ERROR>");
+            status->setStatusBar(StatusControl::StatusBarState::ERROR);
             break;
 
         case SystemHardwareStateChanged::HardwareState::STANDBY:
-            std::cerr << "setHardwareState <STANDBY>" << std::endl;
-            statusbarState = Bridge::StatusBarState::STANDBY;
+            syslog(LOG_INFO, "setHardwareState <STANDBY>");
+            status->setStatusBar(StatusControl::StatusBarState::STANDBY);
             break;
 
         case SystemHardwareStateChanged::HardwareState::EMERGENCY_STOP:
-            /* // FIXME: Was machen wir hier?
-            case moba::Message::MT_EMERGENCY_STOP_CLEARING:
-                bridge->setEmergencyStopClearing();
-                bridge->setStatusBar(statusbarState);
-                break;
-             */
-
-            std::cerr << "setHardwareState <EMERGENCY_STOP>" << std::endl;
-            statusbarState = Bridge::StatusBarState::EMERGENCY_STOP;
-            bridge->setEmergencyStop();
-            if(automatic) {
-                bridge->mainLightOn();
-            }
+            syslog(LOG_INFO, "setHardwareState <EMERGENCY_STOP>");
+            status->setStatusBar(StatusControl::StatusBarState::EMERGENCY_STOP);
             break;
 
         case SystemHardwareStateChanged::HardwareState::MANUEL:
-            std::cerr << "setHardwareState <MANUEL>" << std::endl;
-            automatic = false;
-            bridge->curtainUp();
-            setAmbientLight();
-            statusbarState = Bridge::StatusBarState::READY;
+            syslog(LOG_INFO, "setHardwareState <MANUEL>");
+            status->setStatusBar(StatusControl::StatusBarState::MANUEL);
+            eclctr->stopEclipse();
+//            setAmbientLight();
             break;
 
         case SystemHardwareStateChanged::HardwareState::AUTOMATIC:
-            std::cerr << "setHardwareState <AUTOMATIC>" << std::endl;
-            automatic = true;
-            bridge->curtainDown();
-            bridge->mainLightOff();
-            statusbarState = Bridge::StatusBarState::AUTOMATIC;
+            syslog(LOG_INFO, "setHardwareState <AUTOMATIC>");
+            status->setStatusBar(StatusControl::StatusBarState::AUTOMATIC);
+            eclctr->startEclipse();
+//            setAmbientLight();
             break;
     }
-    bridge->setStatusBar(statusbarState);
 }
 
 void MessageLoop::setError(const ClientError &data) {
-    std::cerr << "ErrorId <" << data.errorId << "> " << data.additionalMsg << std::endl;
+    syslog(LOG_INFO, "ErrorId <%s> %s", data.errorId.c_str(), data.additionalMsg.c_str());
 }
+
+void MessageLoop::setAmbience(const EnvSetAmbience &data) {
+    if(automatic) {
+        syslog(LOG_WARNING, "setAmbience: automatic is on!");
+        return;
+    }
+
+    if(data.curtainUp == ToggleState::ON) {
+//        eclctr->curtainUp();
+    } else if(data.curtainUp == ToggleState::OFF) {
+//        eclctr->curtainDown();
+    }
+
+    if(data.mainLightOn == ToggleState::ON) {
+        eclctr->mainLightOn();
+    } else if(data.mainLightOn == ToggleState::OFF) {
+        eclctr->mainLightOff();
+    }
+}
+
+void MessageLoop::shutdown() {
+    syslog(LOG_INFO, "shutdown");
+    execl("/usr/local/bin/moba-shutdown", "moba-shutdown", (char *)NULL);
+}
+
+void MessageLoop::reboot() {
+    syslog(LOG_INFO, "reboot");
+    execl("/usr/local/bin/moba-shutdown", "moba-shutdown", "-r", (char *)NULL);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*
 void MessageLoop::setAmbientLight(const Envi) {
@@ -168,7 +173,7 @@ void MessageLoop::setAmbientLight(const Envi) {
 }
  */
 
-
+/*
 void MessageLoop::setAmbientLight() {
     bridge->setAmbientLight(
         ambientLightData.blue,
@@ -178,6 +183,7 @@ void MessageLoop::setAmbientLight() {
         20
     );
 }
+ */
 
 
 
@@ -195,9 +201,6 @@ void MessageLoop::setAmbientLight() {
                 setEnvironment(msg->getData());
                 break;
 
-            case moba::Message::MT_SET_AMBIENCE:
-                setAmbience(msg->getData());
-                break;
 
             case moba::Message::MT_SET_AMBIENT_LIGHT:
                 setAmbientLight(msg->getData());
@@ -260,30 +263,6 @@ void MessageLoop::setEnvironment(moba::JsonItemPtr ptr) {
     }
 }
 
-void MessageLoop::setAmbience(moba::JsonItemPtr ptr) {
-    moba::JsonObjectPtr o = boost::dynamic_pointer_cast<moba::JsonObject>(ptr);
-    moba::JsonToggleState::ToggleState cuup = moba::castToToggleState(o->at("curtainUp"));
-    moba::JsonToggleState::ToggleState mlon = moba::castToToggleState(o->at("mainLightOn"));
-
-    LOG(moba::NOTICE) << "curtainUp    <" << cuup << ">" << std::endl;
-    LOG(moba::NOTICE) << "mainLightOn  <" << mlon << ">" << std::endl;
-
-    if(automatic) {
-        LOG(moba::WARNING) << "automatic is on!" << std::endl;
-        return;
-    }
-
-    if(mlon == moba::JsonToggleState::ON) {
-        bridge->mainLightOn();
-    } else if(mlon == moba::JsonToggleState::OFF) {
-        bridge->mainLightOff();
-    }
-    if(cuup == moba::JsonToggleState::ON) {
-        bridge->curtainUp();
-    } else if(cuup == moba::JsonToggleState::OFF) {
-        bridge->curtainDown();
-    }
-}
 
 void MessageLoop::globalTimerEvent(moba::JsonItemPtr ptr) {
     moba::JsonObjectPtr o = boost::dynamic_pointer_cast<moba::JsonObject>(ptr);
