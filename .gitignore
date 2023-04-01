@@ -73,3 +73,4 @@ moba-environment
 .dirstamp
 *.o
 *~
+!.gitkeep
