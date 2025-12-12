@@ -1,7 +1,7 @@
 /*
  *  Project:    moba-environment
  *
- *  Copyright (C) 2015 Stefan Paproth <pappi-@gmx.de>
+ *  Copyright (C) 2025 Stefan Paproth <pappi-@gmx.de>
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU Affero General Public License as
@@ -14,7 +14,7 @@
  *  GNU Affero General Public License for more details.
  *
  *  You should have received a copy of the GNU Affero General Public License
- *  along with this program. If not, see <http://www.gnu.org/licenses/agpl.txt>.
+ *  along with this program. If not, see <https://www.gnu.org/licenses/agpl.txt>.
  *
  */
 
@@ -46,7 +46,13 @@ namespace {
     };
 }
 
-int main(int argc, char* argv[]) {
+int main(const int argc, char *argv[]) {
+    if(argc == 2) {
+        appData.host = std::string(argv[1]);
+    }
+
+	unsigned int deviceId = 0;
+
     moba::Daemon daemon{appData.appName};
 
     daemon.daemonize();
