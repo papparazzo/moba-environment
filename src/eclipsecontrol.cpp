@@ -120,16 +120,16 @@ void EclipseControl::curtainControl() {
 
             case CurtainState::POS_DOWN:
                 x = 130 - curtainPos;
-                bridge->setHight(Bridge::CURTAIN_DIR);
+                bridge->setHigh(Bridge::CURTAIN_DIR);
                 break;
 
             case CurtainState::RUNNING_DOWN:
-                x = curtainPos
-                bridge->setHight(Bridge::CURTAIN_DIR);
+                x = curtainPos;
+                bridge->setHigh(Bridge::CURTAIN_DIR);
                 break;
         }
 
-        bridge->setHight(Bridge::CURTAIN_ON);
+        bridge->setHigh(Bridge::CURTAIN_ON);
 
         do {
             if(curtainState == CurtainState::STOP) {

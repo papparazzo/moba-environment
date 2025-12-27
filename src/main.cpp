@@ -67,9 +67,11 @@ int main(const int argc, char *argv[]) {
     auto endpoint = EndpointPtr{new Endpoint{
         socket,
         appData.appName,
+        "environment",
         appData.version,
         {Message::SYSTEM, Message::TIMER, Message::ENVIRONMENT}
     }};
+
 
     auto bridge = std::make_shared<Bridge>();
     auto status = std::make_shared<StatusControl>(bridge, endpoint);

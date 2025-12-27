@@ -25,14 +25,14 @@
 #include <atomic>
 #include <thread>
 
-class EclipseControl {
+class EclipseControl final {
 public:
     EclipseControl(BridgePtr bridge, moba::IniPtr ini);
 
     EclipseControl(const EclipseControl&) = delete;
     EclipseControl& operator=(const EclipseControl&) = delete;
 
-    virtual ~EclipseControl();
+    ~EclipseControl();
 
     void startEclipse();
     void stopEclipse();

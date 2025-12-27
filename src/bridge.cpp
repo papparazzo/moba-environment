@@ -57,13 +57,7 @@ Bridge::Bridge() {
     pinMode(Bridge::CURTAIN_DIR,       OUTPUT);
     pinMode(Bridge::CURTAIN_ON,        OUTPUT);
     pinMode(Bridge::MAIN_LIGHT,        OUTPUT);
-    pinMode(Bridge::SHUTDOWN,          OUTPUT);
-    pinMode(Bridge::AUX_1,             OUTPUT);
-    pinMode(Bridge::AUX_2,             OUTPUT);
-    pinMode(Bridge::AUX_3,             OUTPUT);
-    pinMode(Bridge::FLASH_1,           OUTPUT);
-    pinMode(Bridge::FLASH_2,           OUTPUT);
-    pinMode(Bridge::FLASH_3,           OUTPUT);
+
     pinMode(Bridge::STATUS_RED,        OUTPUT);
     pinMode(Bridge::STATUS_GREEN,      OUTPUT);
 
@@ -74,7 +68,7 @@ Bridge::Bridge() {
 Bridge::~Bridge() {
 }
 
-void Bridge::setHight(PinOutputMapping pin) {
+void Bridge::setHigh(PinOutputMapping pin) {
     std::lock_guard<std::mutex> l{m};
     digitalWrite(pin, HIGH);
 }

@@ -100,7 +100,7 @@ void StatusControl::statusBarControl() {
             case StatusBarState::ERROR:
             case StatusBarState::INIT:
             case StatusBarState::EMERGENCY_STOP:
-                bridge->setHight(Bridge::STATUS_RED);
+                bridge->setHigh(Bridge::STATUS_RED);
                 bridge->setLow(Bridge::STATUS_GREEN);
                 break;
 
@@ -108,7 +108,7 @@ void StatusControl::statusBarControl() {
             case StatusBarState::MANUEL:
             case StatusBarState::AUTOMATIC:
                 bridge->setLow(Bridge::STATUS_RED);
-                bridge->setHight(Bridge::STATUS_GREEN);
+                bridge->setHigh(Bridge::STATUS_GREEN);
                 break;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(25));

@@ -23,7 +23,7 @@
 #include <memory>
 #include <mutex>
 
-class Bridge {
+class Bridge final {
 public:
 
     enum PinInputMapping {
@@ -40,23 +40,16 @@ public:
 
         CURTAIN_DIR  = 22,       // PIN 31
         CURTAIN_ON   = 21,       // PIN 29
-
-        AUX_1        = 5,        // PIN 18
-        AUX_2        = 4,        // PIN 16
-        AUX_3        = 3,        // PIN 15
-
-        FLASH_1      = 2,        // PIN 13
-        FLASH_2      = 1,        // PIN 12
-        FLASH_3      = 0,        // PIN 11
     };
 
     Bridge();
-    virtual ~Bridge();
+
+    ~Bridge();
 
     Bridge(const Bridge&) = delete;
     Bridge& operator=(const Bridge&) = delete;
 
-    void setHight(PinOutputMapping pin);
+    void setHigh(PinOutputMapping pin);
     void setLow(PinOutputMapping pin);
     bool getDebounced(PinInputMapping pin);
 
